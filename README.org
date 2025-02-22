@@ -1,0 +1,47 @@
+* BoTifiCator
+
+Project for monitoring some selected bitcoin indicators
+
+** Database
+
+Up
+
+#+begin_src bash
+docker run --name timescaledb-container \
+  -e POSTGRES_PASSWORD=mysecretpassword \
+  -v timescaledb_data:/var/lib/postgresql/data \
+  -p 5432:5432 \
+  -d timescale/timescaledb:latest-pg15
+#+end_src
+
+Interact
+
+#+begin_src bash
+docker exec -it timescaledb-container psql -U postgres -p 5432 -h localhost
+#+end_src
+
+** Data
+
+bitstamp.com http api
+
+*** Rate Limits
+
+400 per second
+
+#+begin_src julia
+1000 / 400
+#+end_src
+
+#+RESULTS:
+: 2.5
+
+10 000 per 10 minutes
+
+#+begin_src julia
+1000 * 60 * 10 / 10000
+#+end_src
+
+#+RESULTS:
+: 60.0
+
+=> wait 100 ms per request just to be safe
