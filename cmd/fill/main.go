@@ -17,19 +17,17 @@ const (
 	step = 5 * 60
 )
 
-// var startTime = time.Date(2024, 6, 1, 0, 0, 0, 0, time.UTC)
-var startTime = time.Date(2025, 2, 21, 0, 0, 0, 0, time.UTC)
+var startTime = time.Date(2024, 6, 1, 0, 0, 0, 0, time.UTC)
 
 func main() {
 	ctx := context.Background()
 
 	conn, err := setupDatabase(ctx)
-	defer conn.Close(ctx)
-
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "could not setup database: %s\n", err)
 		os.Exit(1)
 	}
+	defer conn.Close(ctx)
 
 	client := resty.New()
 	for {
@@ -51,7 +49,7 @@ func main() {
 		}
 
 		if done {
-			fmt.Fprint(os.Stderr, "no more new data, exiting")
+			fmt.Fprint(os.Stderr, "no more new data, exiting\n")
 			os.Exit(0)
 		}
 

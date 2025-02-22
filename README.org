@@ -7,7 +7,11 @@ Project for monitoring some selected bitcoin indicators
 Up
 
 #+begin_src bash
-docker run --name timescaledb-container -e POSTGRES_PASSWORD=mysecretpassword -p 5432:5432 -d timescale/timescaledb:latest-pg15
+docker run --name timescaledb-container \
+  -e POSTGRES_PASSWORD=mysecretpassword \
+  -v timescaledb_data:/var/lib/postgresql/data \
+  -p 5432:5432 \
+  -d timescale/timescaledb:latest-pg15
 #+end_src
 
 Interact
@@ -16,22 +20,7 @@ Interact
 docker exec -it timescaledb-container psql -U postgres -p 5432 -h localhost
 #+end_src
 
-Create table
-
-#+begin_src sql
-CREATE TABLE btc (
-    time TIMESTAMPTZ NOT NULL,
-    open DECIMAL NOT NULL,
-    high DECIMAL NOT NULL,
-    low DECIMAL NOT NULL,
-    close DECIMAL NOT NULL,
-    volume DECIMAL NOT NULL
-);
-
-SELECT create_hypertable('btc', 'time');
-#+end_src
-
-** Download
+** Data
 
 bitstamp.com http api
 

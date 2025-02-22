@@ -81,13 +81,13 @@ func getLatestTimestamp(ctx context.Context, conn *pgx.Conn, tableName string) (
 }
 
 func insertDataPoint(ctx context.Context, conn *pgx.Conn, tableName string, element HistoricalDataPoint) error {
-	query := fmt.Sprintf(`
+	command := fmt.Sprintf(`
 		INSERT INTO %s  (time, open, high, low, close, volume)
 		VALUES (to_timestamp($1), $2, $3, $4, $5, $6)
 		ON CONFLICT (time) DO NOTHING
 	`, tableName)
 
-	result, err := conn.Exec(ctx, query, element.Timestamp, element.Open, element.High, element.Low, element.Close, element.Volume)
+	result, err := conn.Exec(ctx, command, element.Timestamp, element.Open, element.High, element.Low, element.Close, element.Volume)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "could not execute query to insert row in %s: %s\n", tableName, err)
 		return err
