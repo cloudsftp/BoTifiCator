@@ -29,12 +29,12 @@ func setupDatabase(ctx context.Context) (*pgx.Conn, error) {
 func createTable(ctx context.Context, conn *pgx.Conn, tableName string) error {
 	_, err := conn.Exec(ctx, fmt.Sprintf(`
 		CREATE TABLE IF NOT EXISTS %s (
-			time TIMESTAMPTZ NOT NULL UNIQUE,
-			open DECIMAL NOT NULL,
-			high DECIMAL NOT NULL,
-			low DECIMAL NOT NULL,
-			close DECIMAL NOT NULL,
-			volume DECIMAL NOT NULL
+			time   TIMESTAMPTZ    NOT NULL UNIQUE,
+			open   DECIMAL(30,5)  NOT NULL,
+			high   DECIMAL(30,5)  NOT NULL,
+			low    DECIMAL(30,5)  NOT NULL,
+			close  DECIMAL(30,5)  NOT NULL,
+			volume DECIMAL(40,20) NOT NULL
 		)
 	`, tableName))
 	if err != nil {
