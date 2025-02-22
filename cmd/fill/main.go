@@ -13,6 +13,8 @@ import (
 
 const (
 	bistampRootUrl = "https://www.bitstamp.net/api/v2/"
+
+	step = 5 * 60
 )
 
 // var startTime = time.Date(2024, 6, 1, 0, 0, 0, 0, time.UTC)
@@ -29,19 +31,32 @@ func main() {
 		os.Exit(1)
 	}
 
-	latestTimestamp, ok, err := getLatestTimestamp(ctx, conn, tableName)
-	if err != nil {
-		os.Exit(1)
-	}
-	if !ok {
-		latestTimestamp = startTime.Unix()
-	}
-
 	client := resty.New()
-	err = getData(ctx, client, conn, latestTimestamp)
-	if err != nil {
-		fmt.Fprintf(os.Stderr, "could not get data: %s\n", err)
-		os.Exit(1)
+	for {
+		startTimestamp, ok, err := getLatestTimestamp(ctx, conn, tableName)
+		if err != nil {
+			os.Exit(1)
+		}
+		startTimestamp += step
+		if !ok {
+			startTimestamp = startTime.Unix()
+		}
+
+		fmt.Printf("current timestamp: %s\n", time.Unix(startTimestamp, 0).Format(time.RFC3339))
+
+		done, err := downloadData(ctx, client, conn, startTimestamp)
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "could not get data: %s\n", err)
+			os.Exit(1)
+		}
+
+		if done {
+			fmt.Fprint(os.Stderr, "no more new data, exiting")
+			os.Exit(0)
+		}
+
+		// Try not to get rate-limited
+		time.Sleep(100 * time.Millisecond)
 	}
 }
 
@@ -63,46 +78,41 @@ type HistoricalDataResponseWrapper struct {
 	Inner HistoricalDataResponse `json:"data"`
 }
 
-func getData(ctx context.Context, client *resty.Client, conn *pgx.Conn, latestTimestamp int64) error {
+func downloadData(ctx context.Context, client *resty.Client, conn *pgx.Conn, currentTimestamp int64) (bool, error) {
 	result, err := client.R().WithContext(ctx).SetQueryParams(map[string]string{
-		"step":                   "300",
-		"limit":                  "100",
+		"step":                   fmt.Sprint(step),
+		"limit":                  "1000",
 		"exclude_current_candle": "true",
-		"start":                  fmt.Sprint(latestTimestamp),
+		"start":                  fmt.Sprint(currentTimestamp),
 	}).Get(bistampRootUrl + "ohlc/btcusd")
 
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "Unable to connect to bitstamp: %v\n", err)
-		return err
+		return false, err
 	}
 
 	if result.Err != nil {
 		fmt.Fprintf(os.Stderr, "Result contains error: %v\n", result.Err)
-		return err
+		return false, err
 	}
 
 	var data HistoricalDataResponseWrapper
 	err = json.NewDecoder(result.Body).Decode(&data)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "Could not decode body: %v\n", err)
-		return err
+		return false, err
 	}
 
-	fmt.Println()
+	if len(data.Inner.Data) == 0 {
+		return true, nil
+	}
 
 	for _, point := range data.Inner.Data {
-		insertDataPoint(ctx, conn, tableName, point)
+		err = insertDataPoint(ctx, conn, tableName, point)
+		if err != nil {
+			return false, err
+		}
 	}
 
-	/*
-		_, err =
-			conn.Exec(ctx, "INSERT INTO btc (time, open, high, low, close, volume) VALUES (to_timestamp($1), $2, $3, $4, $5, $6)",
-				recordTimestamp, record[1], record[2], record[3], record[4], record[5])
-
-		if err != nil {
-			fmt.Fprintf(os.Stderr, "Unable to insert record: %v\n", err)
-		}
-	*/
-
-	return nil
+	return false, nil
 }
