@@ -77,11 +77,9 @@ func downloadData(ctx context.Context, client *resty.Client, conn *pgx.Conn, cur
 		return true, nil
 	}
 
-	for _, point := range data.Inner.Data {
-		err = db.InsertDataPoint(ctx, conn, point)
-		if err != nil {
-			return false, err
-		}
+	err = db.InsertDataPoints(ctx, conn, data.Inner.Data)
+	if err != nil {
+		return false, err
 	}
 
 	return false, nil

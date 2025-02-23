@@ -4,6 +4,8 @@ import (
 	"context"
 	"fmt"
 	"os"
+	"strconv"
+	"time"
 
 	"github.com/cloudsftp/botificator/pkg/api"
 	"github.com/jackc/pgx/v5"
@@ -81,20 +83,30 @@ func GetLatestTimestamp(ctx context.Context, conn *pgx.Conn) (int64, bool, error
 	return latestTimestamp, true, nil
 }
 
-func InsertDataPoint(ctx context.Context, conn *pgx.Conn, element api.HistoricalDataPoint) error {
-	command := fmt.Sprintf(`
-		INSERT INTO %s  (time, open, high, low, close, volume)
-		VALUES (to_timestamp($1), $2, $3, $4, $5, $6)
-		ON CONFLICT (time) DO NOTHING
-	`, tableName)
+func InsertDataPoints(ctx context.Context, conn *pgx.Conn, elements []api.HistoricalDataPoint) error {
+	copyCount, err := conn.CopyFrom(
+		ctx,
+		pgx.Identifier{tableName},
+		[]string{"time", "open", "high", "low", "close", "volume"},
+		pgx.CopyFromSlice(len(elements), func(i int) ([]any, error) {
+			element := elements[i]
 
-	result, err := conn.Exec(ctx, command, element.Timestamp, element.Open, element.High, element.Low, element.Close, element.Volume)
+			unixSeconds, err := strconv.ParseInt(element.Timestamp, 10, 64)
+			if err != nil {
+				return nil, err
+			}
+			timeDate := time.Unix(unixSeconds, 0)
+
+			return []any{timeDate, element.Open, element.High, element.Low, element.Close, element.Volume}, nil
+		}),
+	)
+
 	if err != nil {
-		fmt.Fprintf(os.Stderr, "could not execute query to insert row in %s: %s\n", tableName, err)
+		fmt.Fprintf(os.Stderr, "could not execute query to insert rows: %s\n", err)
 		return err
 	}
 
-	if result.RowsAffected() == 0 {
+	if copyCount == 0 {
 		fmt.Fprint(os.Stderr, "row not inserted, time already exists\n")
 	}
 
