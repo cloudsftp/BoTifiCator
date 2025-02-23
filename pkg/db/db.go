@@ -108,7 +108,7 @@ func GetLatestTimestamp(ctx context.Context, conn *pgx.Conn) (int64, bool, error
 	return latestTimestamp, true, nil
 }
 
-func InsertDataPoints(ctx context.Context, conn *pgx.Conn, elements []api.HistoricalDataPoint) error {
+func InsertDataPoints(ctx context.Context, conn *pgx.Conn, elements []api.HistoricalDataPoint) (bool, error) {
 	copyCount, err := conn.CopyFrom(
 		ctx,
 		pgx.Identifier{tableName},
@@ -128,12 +128,13 @@ func InsertDataPoints(ctx context.Context, conn *pgx.Conn, elements []api.Histor
 
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "could not execute query to insert rows: %s\n", err)
-		return err
+		return false, err
 	}
 
 	if copyCount == 0 {
-		fmt.Fprint(os.Stderr, "row not inserted, time already exists\n")
+		fmt.Fprint(os.Stderr, "no rows inserted")
+		return false, nil
 	}
 
-	return nil
+	return true, nil
 }
