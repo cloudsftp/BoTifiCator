@@ -1,16 +1,17 @@
-package main
+package db
 
 import (
 	"context"
 	"fmt"
 	"os"
 
+	"github.com/cloudsftp/botificator/pkg/api"
 	"github.com/jackc/pgx/v5"
 )
 
 const tableName = "btc_5min"
 
-func setupDatabase(ctx context.Context) (*pgx.Conn, error) {
+func SetupDatabase(ctx context.Context) (*pgx.Conn, error) {
 	connStr := "postgres://postgres:mysecretpassword@localhost:5432/postgres"
 
 	conn, err := pgx.Connect(ctx, connStr)
@@ -51,7 +52,7 @@ func createTable(ctx context.Context, conn *pgx.Conn, tableName string) error {
 	return nil
 }
 
-func getLatestTimestamp(ctx context.Context, conn *pgx.Conn, tableName string) (int64, bool, error) {
+func GetLatestTimestamp(ctx context.Context, conn *pgx.Conn) (int64, bool, error) {
 	query := fmt.Sprintf(`
 		SELECT EXTRACT(EPOCH FROM time) AS unix_seconds
 		FROM %s
@@ -80,7 +81,7 @@ func getLatestTimestamp(ctx context.Context, conn *pgx.Conn, tableName string) (
 	return latestTimestamp, true, nil
 }
 
-func insertDataPoint(ctx context.Context, conn *pgx.Conn, tableName string, element HistoricalDataPoint) error {
+func InsertDataPoint(ctx context.Context, conn *pgx.Conn, element api.HistoricalDataPoint) error {
 	command := fmt.Sprintf(`
 		INSERT INTO %s  (time, open, high, low, close, volume)
 		VALUES (to_timestamp($1), $2, $3, $4, $5, $6)

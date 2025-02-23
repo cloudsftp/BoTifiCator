@@ -1,4 +1,4 @@
-module github.com/cloudsftp/BoTifiCator
+module github.com/cloudsftp/botificator
 
 go 1.23.6
 
