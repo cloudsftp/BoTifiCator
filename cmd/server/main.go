@@ -10,6 +10,7 @@ import (
 
 	"github.com/joho/godotenv"
 
+	"github.com/cloudsftp/botificator/pkg/analyzer"
 	"github.com/cloudsftp/botificator/pkg/db"
 	"github.com/cloudsftp/botificator/pkg/load"
 )
@@ -47,5 +48,5 @@ func main() {
 		os.Exit(1)
 	}
 
-	fmt.Println(averages)
+	analyzer.Analyze(averages)
 }

@@ -10,6 +10,7 @@ import (
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 
+	"github.com/cloudsftp/botificator/pkg/analyzer"
 	"github.com/cloudsftp/botificator/pkg/api"
 )
 
@@ -171,13 +172,7 @@ func InsertDataPoints(ctx context.Context, conn *pgx.Conn, elements []api.Histor
 	return true, nil
 }
 
-type MovingAverages struct {
-	Time    time.Time
-	Ma100   float64
-	Ma350x2 float64
-}
-
-func GetMovingAverages(ctx context.Context, pool *pgxpool.Pool) ([]MovingAverages, error) {
+func GetMovingAverages(ctx context.Context, pool *pgxpool.Pool) ([]analyzer.MovingAverages, error) {
 	query := fmt.Sprintf(`
 		SELECT
 			day,
@@ -194,12 +189,17 @@ func GetMovingAverages(ctx context.Context, pool *pgxpool.Pool) ([]MovingAverage
 	}
 	defer result.Close()
 
-	var averages []MovingAverages
+	var averages []analyzer.MovingAverages
 	for result.Next() {
-		var averagesRow MovingAverages
-		result.Scan(&averagesRow.Time, &averagesRow.Ma100, &averagesRow.Ma350x2)
+		var averagesRow analyzer.MovingAverages
+		err = result.Scan(&averagesRow.Time, &averagesRow.Ma100, &averagesRow.Ma350x2)
+		if err != nil {
+			return nil, fmt.Errorf("could not scan row: %w", err)
+		}
+
 		averages = append(averages, averagesRow)
 	}
 
+	// averages = averages[1:]
 	return averages, nil
 }
