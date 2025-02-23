@@ -7,15 +7,31 @@ import (
 	"strconv"
 	"time"
 
-	"github.com/cloudsftp/botificator/pkg/api"
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
+
+	"github.com/cloudsftp/botificator/pkg/api"
 )
 
 const tableName = "btc_5min"
 
 func SetupDatabase(ctx context.Context) (*pgxpool.Pool, error) {
-	connectionString := "postgres://postgres:mysecretpassword@localhost:5432/postgres"
+	pass := os.Getenv("DB_PASS")
+	if pass == "" {
+		return nil, fmt.Errorf("no environment variable DB_PASS")
+	}
+
+	host := os.Getenv("DB_HOST")
+	if host == "" {
+		return nil, fmt.Errorf("no environment variable DB_HOST")
+	}
+
+	port := os.Getenv("DB_PORT")
+	if port == "" {
+		return nil, fmt.Errorf("no environment variable DB_PORT")
+	}
+
+	connectionString := fmt.Sprintf("postgres://postgres:%s@%s:%s/postgres", pass, host, port)
 
 	config, err := pgxpool.ParseConfig(connectionString)
 	if err != nil {

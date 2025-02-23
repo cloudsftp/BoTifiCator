@@ -30,7 +30,7 @@ func LoadDataIntoDatabase(ctx context.Context, client *resty.Client, pool *pgxpo
 	for {
 		startTimestamp, ok, err := db.GetLatestTimestamp(ctx, conn.Conn())
 		if err != nil {
-			os.Exit(1)
+			return err
 		}
 		startTimestamp += step
 		if !ok {
@@ -42,12 +42,12 @@ func LoadDataIntoDatabase(ctx context.Context, client *resty.Client, pool *pgxpo
 		done, err := downloadData(ctx, client, conn.Conn(), startTimestamp)
 		if err != nil {
 			fmt.Fprintf(os.Stderr, "could not get data: %s\n", err)
-			os.Exit(1)
+			return err
 		}
 
 		if done {
-			fmt.Fprint(os.Stderr, "no more new data, exiting\n")
-			os.Exit(0)
+			fmt.Println("no more new data, exiting loop")
+			return nil
 		}
 
 		// Try not to get rate-limited
