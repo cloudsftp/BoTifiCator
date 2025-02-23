@@ -9,28 +9,37 @@ import (
 
 	"github.com/cloudsftp/botificator/pkg/api"
 	"github.com/jackc/pgx/v5"
+	"github.com/jackc/pgx/v5/pgxpool"
 )
 
 const tableName = "btc_5min"
 
-func SetupDatabase(ctx context.Context) (*pgx.Conn, error) {
-	connStr := "postgres://postgres:mysecretpassword@localhost:5432/postgres"
+func SetupDatabase(ctx context.Context) (*pgxpool.Pool, error) {
+	connectionString := "postgres://postgres:mysecretpassword@localhost:5432/postgres"
 
-	conn, err := pgx.Connect(ctx, connStr)
+	config, err := pgxpool.ParseConfig(connectionString)
 	if err != nil {
 		return nil, err
 	}
 
-	err = createTable(ctx, conn, tableName)
+	config.MaxConns = 20
+	config.MinConns = 2
+
+	pool, err := pgxpool.NewWithConfig(ctx, config)
 	if err != nil {
 		return nil, err
 	}
 
-	return conn, nil
+	err = createTable(ctx, pool, tableName)
+	if err != nil {
+		return nil, err
+	}
+
+	return pool, nil
 }
 
-func createTable(ctx context.Context, conn *pgx.Conn, tableName string) error {
-	_, err := conn.Exec(ctx, fmt.Sprintf(`
+func createTable(ctx context.Context, pool *pgxpool.Pool, tableName string) error {
+	_, err := pool.Exec(ctx, fmt.Sprintf(`
 		CREATE TABLE IF NOT EXISTS %s (
 			time   TIMESTAMPTZ    NOT NULL UNIQUE,
 			open   DECIMAL(30,5)  NOT NULL,
@@ -44,7 +53,7 @@ func createTable(ctx context.Context, conn *pgx.Conn, tableName string) error {
 		return err
 	}
 
-	_, err = conn.Exec(ctx, fmt.Sprintf(`
+	_, err = pool.Exec(ctx, fmt.Sprintf(`
 		SELECT create_hypertable('%s', 'time', if_not_exists => true)
 	`, tableName))
 	if err != nil {

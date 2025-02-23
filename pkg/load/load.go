@@ -10,6 +10,7 @@ import (
 	"github.com/cloudsftp/botificator/pkg/api"
 	"github.com/cloudsftp/botificator/pkg/db"
 	"github.com/jackc/pgx/v5"
+	"github.com/jackc/pgx/v5/pgxpool"
 	"resty.dev/v3"
 )
 
@@ -19,9 +20,15 @@ const (
 	step = 5 * 60
 )
 
-func LoadDataIntoDatabase(ctx context.Context, client *resty.Client, conn *pgx.Conn, startTime time.Time) error {
+func LoadDataIntoDatabase(ctx context.Context, client *resty.Client, pool *pgxpool.Pool, startTime time.Time) error {
+	conn, err := pool.Acquire(ctx)
+	if err != nil {
+		return err
+	}
+	defer conn.Release()
+
 	for {
-		startTimestamp, ok, err := db.GetLatestTimestamp(ctx, conn)
+		startTimestamp, ok, err := db.GetLatestTimestamp(ctx, conn.Conn())
 		if err != nil {
 			os.Exit(1)
 		}
@@ -32,7 +39,7 @@ func LoadDataIntoDatabase(ctx context.Context, client *resty.Client, conn *pgx.C
 
 		fmt.Printf("current timestamp: %s\n", time.Unix(startTimestamp, 0).Format(time.RFC3339))
 
-		done, err := downloadData(ctx, client, conn, startTimestamp)
+		done, err := downloadData(ctx, client, conn.Conn(), startTimestamp)
 		if err != nil {
 			fmt.Fprintf(os.Stderr, "could not get data: %s\n", err)
 			os.Exit(1)
