@@ -200,7 +200,7 @@ func GetMovingAverages(ctx context.Context, pool *pgxpool.Pool) ([]analyzer.Movi
 	var averages []analyzer.MovingAverages
 	for result.Next() {
 		var averagesRow analyzer.MovingAverages
-		err = result.Scan(&averagesRow.Time, &averagesRow.Ma100, &averagesRow.Ma350x2)
+		err = result.Scan(&averagesRow.Time, &averagesRow.Ma111, &averagesRow.Ma350x2)
 		if err != nil {
 			return nil, fmt.Errorf("could not scan row: %w", err)
 		}
