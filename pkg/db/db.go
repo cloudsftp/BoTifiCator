@@ -172,16 +172,24 @@ func InsertDataPoints(ctx context.Context, conn *pgx.Conn, elements []api.Histor
 	return true, nil
 }
 
+func movingAverageSqlRange(numRows uint64) string {
+	return fmt.Sprintf("(ORDER BY day ROWS BETWEEN %d PRECEDING AND CURRENT ROW)", numRows-1)
+}
+
 func GetMovingAverages(ctx context.Context, pool *pgxpool.Pool) ([]analyzer.MovingAverages, error) {
 	query := fmt.Sprintf(`
 		SELECT
 			day,
-			avg(average) over (ORDER BY day ROWS BETWEEN 110 PRECEDING AND CURRENT ROW) AS ma111,
-			2 * avg(average) over (ORDER BY day ROWS BETWEEN 350 PRECEDING AND CURRENT ROW) AS ma350x2
+			avg(average) over %s AS ma111,
+			2 * avg(average) over %s AS ma350x2
 		FROM %s
 		ORDER BY day DESC
 		LIMIT 14;
-    `, dailyAverageView)
+    `,
+		movingAverageSqlRange(111),
+		movingAverageSqlRange(350),
+		dailyAverageView,
+	)
 
 	result, err := pool.Query(ctx, query)
 	if err != nil {
@@ -200,6 +208,5 @@ func GetMovingAverages(ctx context.Context, pool *pgxpool.Pool) ([]analyzer.Movi
 		averages = append(averages, averagesRow)
 	}
 
-	// averages = averages[1:]
 	return averages, nil
 }

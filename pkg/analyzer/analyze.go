@@ -6,7 +6,7 @@ import (
 
 type MovingAverages struct {
 	Time    time.Time
-	Ma100   float64
+	Ma111   float64
 	Ma350x2 float64
 }
 

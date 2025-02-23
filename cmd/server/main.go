@@ -22,31 +22,34 @@ func main() {
 
 	err := godotenv.Load()
 	if err != nil {
-		fmt.Fprintf(os.Stderr, "could not load environment: %s\n", err)
+		fmt.Fprintf(os.Stderr, "could not load environment: %w\n", err)
 		os.Exit(1)
 	}
 
 	pool, err := db.SetupDatabase(ctx)
 	if err != nil {
-		fmt.Fprintf(os.Stderr, "could not setup database: %s\n", err)
+		fmt.Fprintf(os.Stderr, "could not setup database: %w\n", err)
 		os.Exit(1)
 	}
 	defer pool.Close()
 
 	client := resty.New()
 	defer client.Close()
-	_ = client
 	err = load.LoadDataIntoDatabase(ctx, client, pool, startTime)
 	if err != nil {
-		fmt.Fprintf(os.Stderr, "could not load data into database: %s\n", err)
+		fmt.Fprintf(os.Stderr, "could not load data into database: %w\n", err)
 		os.Exit(1)
 	}
 
 	averages, err := db.GetMovingAverages(ctx, pool)
 	if err != nil {
-		fmt.Fprintf(os.Stderr, "could not get moving averages: %s\n", err)
+		fmt.Fprintf(os.Stderr, "could not get moving averages: %w\n", err)
 		os.Exit(1)
 	}
 
-	analyzer.Analyze(averages)
+	err = analyzer.Analyze(averages)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "could not analyze averages: %w\n", err)
+		os.Exit(1)
+	}
 }
