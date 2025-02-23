@@ -14,9 +14,8 @@ import (
 )
 
 const (
-	ohclTable             = "btc_5min"
-	dailyAverageView      = "btc_daily_avg"
-	daily100MovingAverage = "btc_daily_100ma"
+	ohclTable        = "btc_5min"
+	dailyAverageView = "btc_daily_avg"
 )
 
 func SetupDatabase(ctx context.Context) (*pgxpool.Pool, error) {
@@ -84,17 +83,20 @@ func createTables(ctx context.Context, pool *pgxpool.Pool) error {
 		return err
 	}
 
-	_, err = pool.Exec(ctx, fmt.Sprintf(`
+	result, err := pool.Exec(ctx, fmt.Sprintf(`
 		CREATE MATERIALIZED VIEW %s
 		WITH (timescaledb.continuous) AS
 		SELECT
-			time_bucket('1 day', time) AS bucket,
-			AVG(close)
+			time_bucket('1 day', time) AS day,
+			AVG(low) as average
 		FROM
 			%s
 		GROUP BY
-			bucket
+			day
     `, dailyAverageView, ohclTable))
+
+	// TODO: if successful "CREATE MATERIALIZED VIEW"
+	fmt.Printf("result: %v\n", result.String())
 
 	_, err = pool.Exec(ctx, fmt.Sprintf(`
 		ALTER MATERIALIZED VIEW %s set (timescaledb.materialized_only = false);
@@ -103,6 +105,7 @@ func createTables(ctx context.Context, pool *pgxpool.Pool) error {
 	return nil
 }
 
+// GetLatestTimestamp returns the timestamp of the latest row
 func GetLatestTimestamp(ctx context.Context, conn *pgx.Conn) (int64, bool, error) {
 	query := fmt.Sprintf(`
 		SELECT EXTRACT(EPOCH FROM time) AS unix_seconds
@@ -163,4 +166,37 @@ func InsertDataPoints(ctx context.Context, conn *pgx.Conn, elements []api.Histor
 	}
 
 	return true, nil
+}
+
+type MovingAverages struct {
+	Time    time.Time
+	Ma100   float64
+	Ma350x2 float64
+}
+
+func GetMovingAverages(ctx context.Context, pool *pgxpool.Pool) ([]MovingAverages, error) {
+	query := fmt.Sprintf(`
+		SELECT
+			day,
+			avg(average) over (ORDER BY day ROWS BETWEEN 110 PRECEDING AND CURRENT ROW) AS ma111,
+			2 * avg(average) over (ORDER BY day ROWS BETWEEN 350 PRECEDING AND CURRENT ROW) AS ma350x2
+		FROM %s
+		ORDER BY day DESC
+		LIMIT 14;
+    `, dailyAverageView)
+
+	result, err := pool.Query(ctx, query)
+	if err != nil {
+		return nil, fmt.Errorf("could not get moving averages: %w", err)
+	}
+	defer result.Close()
+
+	var averages []MovingAverages
+	for result.Next() {
+		var averagesRow MovingAverages
+		result.Scan(&averagesRow.Time, &averagesRow.Ma100, &averagesRow.Ma350x2)
+		averages = append(averages, averagesRow)
+	}
+
+	return averages, nil
 }

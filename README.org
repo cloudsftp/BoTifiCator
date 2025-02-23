@@ -17,7 +17,7 @@ docker run --name timescaledb-container \
 Interact
 
 #+begin_src bash
-docker exec -it timescaledb-container psql -U postgres -p 5432 -h localhost
+psql -U postgres -p 5432 -h localhost
 #+end_src
 
 *** Averages
@@ -30,16 +30,106 @@ docker exec -it timescaledb-container psql -U postgres -p 5432 -h localhost
 #+RESULTS:
 : 288.0
 
+***** create test data
+
+#+headers: :engine postgresql :cmdline "postgres://postgres:mysecretpassword@localhost:5432/postgres"
 #+begin_src sql
+-- Create the TimescaleDB hypertable
+CREATE TABLE decimal_data (
+    time TIMESTAMPTZ NOT NULL,
+    value DECIMAL(20, 4) NOT NULL
+);
+
+-- Create the hypertable
+SELECT create_hypertable('decimal_data', 'time');
+
+-- Insert random test data
+INSERT INTO decimal_data (time, value) VALUES
+    ('2023-11-20 10:00:00Z', 10),
+    ('2023-11-20 10:01:00Z', 20),
+    ('2023-11-20 10:02:00Z', 10),
+    ('2023-11-20 10:03:00Z', 10),
+    ('2023-11-20 10:04:00Z', 30),
+    ('2023-11-20 10:05:00Z', 10),
+    ('2023-11-20 10:06:00Z', 10),
+    ('2023-11-20 10:07:00Z', 30),
+    ('2023-11-20 10:08:00Z', 30),
+    ('2023-11-20 10:09:00Z', 10),
+    ('2023-11-20 10:10:00Z', 40);
+
+-- Verify the data
+-- SELECT * FROM decimal_data;
+#+end_src
+
+#+RESULTS:
+| CREATE TABLE              |
+|---------------------------|
+| create_hypertable         |
+| (4,public,decimal_data,t) |
+| INSERT 0 11               |
+
+#+headers: :engine postgresql :cmdline "postgres://postgres:mysecretpassword@localhost:5432/postgres"
+#+begin_src sql
+-- Verify the data
 SELECT
     time,
-    close,
-    AVG(close) OVER (ORDER BY time ROWS BETWEEN 288 PRECEDING AND CURRENT ROW) AS moving_average
-FROM
-    btc_5min
-ORDER BY
-    time;
+    avg(value) over (ORDER BY time ROWS BETWEEN 1 PRECEDING AND CURRENT ROW) AS moving_average_2
+FROM decimal_data
+ORDER BY time DESC
+LIMIT 8;
 #+end_src
+
+#+RESULTS:
+| time                   |    moving_average_2 |
+|------------------------+---------------------|
+| 2023-11-20 10:10:00+00 | 25.0000000000000000 |
+| 2023-11-20 10:09:00+00 | 10.0000000000000000 |
+| 2023-11-20 10:08:00+00 | 10.0000000000000000 |
+| 2023-11-20 10:07:00+00 | 10.0000000000000000 |
+| 2023-11-20 10:06:00+00 | 10.0000000000000000 |
+| 2023-11-20 10:05:00+00 | 20.0000000000000000 |
+| 2023-11-20 10:04:00+00 | 20.0000000000000000 |
+| 2023-11-20 10:03:00+00 | 10.0000000000000000 |
+
+#+headers: :engine postgresql :cmdline "postgres://postgres:mysecretpassword@localhost:5432/postgres"
+#+begin_src sql
+-- Verify the data
+drop table decimal_data;
+#+end_src
+
+#+RESULTS:
+| DROP TABLE |
+|------------|
+
+#+headers: :engine postgresql :cmdline "postgres://postgres:mysecretpassword@localhost:5432/postgres"
+#+begin_src sql
+-- Verify the data
+SELECT
+    day,
+    avg(average) over (ORDER BY day ROWS BETWEEN 110 PRECEDING AND CURRENT ROW) AS ma111,
+    2 * avg(average) over (ORDER BY day ROWS BETWEEN 350 PRECEDING AND CURRENT ROW) AS ma350x2
+FROM btc_daily_avg
+ORDER BY day DESC
+LIMIT 14;
+#+end_src
+
+#+RESULTS:
+| day                    |              ma111 |             ma350x2 |
+|------------------------+--------------------+---------------------|
+| 2025-02-23 00:00:00+00 | 96275.200796604988 | 153574.318876084894 |
+| 2025-02-22 00:00:00+00 | 96023.554429429429 | 153428.099433000416 |
+| 2025-02-21 00:00:00+00 | 95771.038976476476 | 153279.613956766918 |
+| 2025-02-20 00:00:00+00 | 95516.935873373373 | 153120.731551362684 |
+| 2025-02-19 00:00:00+00 | 95266.423392142142 | 152962.670086279462 |
+| 2025-02-18 00:00:00+00 | 95046.276964464464 | 152815.103559357836 |
+| 2025-02-17 00:00:00+00 | 94837.546139889890 | 152670.632315521628 |
+| 2025-02-16 00:00:00+00 | 94616.471878128128 | 152519.603528097062 |
+| 2025-02-15 00:00:00+00 | 94358.638513513514 | 152358.730315170940 |
+| 2025-02-14 00:00:00+00 | 94086.411129879880 | 152193.592824967824 |
+| 2025-02-13 00:00:00+00 | 93814.922297297297 | 152031.289540267012 |
+| 2025-02-12 00:00:00+00 | 93555.207864114114 | 151873.078577604842 |
+| 2025-02-11 00:00:00+00 | 93296.260166416416 | 151714.964680989584 |
+| 2025-02-10 00:00:00+00 | 93020.574324324324 | 151548.224400871460 |
 
 ** Data
 

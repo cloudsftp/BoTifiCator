@@ -34,9 +34,20 @@ func main() {
 
 	client := resty.New()
 	defer client.Close()
-	err = load.LoadDataIntoDatabase(ctx, client, pool, startTime)
+	_ = client
+	if false {
+		err = load.LoadDataIntoDatabase(ctx, client, pool, startTime)
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "could not load data into database: %s\n", err)
+			os.Exit(1)
+		}
+	}
+
+	averages, err := db.GetMovingAverages(ctx, pool)
 	if err != nil {
-		fmt.Fprintf(os.Stderr, "could not load data into database: %s\n", err)
+		fmt.Fprintf(os.Stderr, "could not get moving averages: %s\n", err)
 		os.Exit(1)
 	}
+
+	fmt.Println(averages)
 }
