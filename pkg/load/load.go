@@ -24,13 +24,13 @@ const (
 func LoadDataIntoDatabase(ctx context.Context, client *resty.Client, pool *pgxpool.Pool, startTime time.Time) error {
 	conn, err := pool.Acquire(ctx)
 	if err != nil {
-		return err
+		return fmt.Errorf("failed to acquire connection from pool: %w", err)
 	}
 	defer conn.Release()
 
 	startTimestamp, ok, err := db.GetLatestTimestamp(ctx, conn.Conn())
 	if err != nil {
-		return err
+		return fmt.Errorf("failed to get the latest timestamp: %w", err)
 	}
 	startTimestamp += step
 	if !ok {
@@ -43,7 +43,6 @@ func LoadDataIntoDatabase(ctx context.Context, client *resty.Client, pool *pgxpo
 
 		lastTimestamp, done, err := downloadData(ctx, client, conn.Conn(), currentTimestamp)
 		if err != nil {
-			fmt.Fprintf(os.Stderr, "could not get data: %s\n", err)
 			return err
 		}
 
@@ -68,20 +67,17 @@ func downloadData(ctx context.Context, client *resty.Client, conn *pgx.Conn, cur
 	}).Get(bistampRootUrl + "ohlc/btcusd")
 
 	if err != nil {
-		fmt.Fprintf(os.Stderr, "Unable to connect to bitstamp: %v\n", err)
-		return 0, false, err
+		return 0, false, fmt.Errorf("requesting data from bitstamp: %w", err)
 	}
 
 	if result.Err != nil {
-		fmt.Fprintf(os.Stderr, "Result contains error: %v\n", result.Err)
-		return 0, false, err
+		return 0, false, fmt.Errorf("result contains error: %w", result.Err)
 	}
 
 	var data api.HistoricalDataResponseWrapper
 	err = json.NewDecoder(result.Body).Decode(&data)
 	if err != nil {
-		fmt.Fprintf(os.Stderr, "Could not decode body: %v\n", err)
-		return 0, false, err
+		return 0, false, fmt.Errorf("could not decode body: %w", err)
 	}
 
 	if len(data.Inner.Data) == 0 {

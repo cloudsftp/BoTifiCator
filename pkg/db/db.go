@@ -108,6 +108,8 @@ func GetLatestTimestamp(ctx context.Context, conn *pgx.Conn) (int64, bool, error
 	return latestTimestamp, true, nil
 }
 
+// InsertDataPoints efficiently inserts multiple data points using COPY.
+// Returns true if any rows were inserted, false otherwise.
 func InsertDataPoints(ctx context.Context, conn *pgx.Conn, elements []api.HistoricalDataPoint) (bool, error) {
 	copyCount, err := conn.CopyFrom(
 		ctx,
