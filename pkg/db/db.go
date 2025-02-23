@@ -13,9 +13,27 @@ import (
 	"github.com/cloudsftp/botificator/pkg/api"
 )
 
-const tableName = "btc_5min"
+const (
+	ohclTable             = "btc_5min"
+	dailyAverageView      = "btc_daily_avg"
+	daily100MovingAverage = "btc_daily_100ma"
+)
 
 func SetupDatabase(ctx context.Context) (*pgxpool.Pool, error) {
+	pool, err := createConnectionPool(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("could not create a connection pool: %w", err)
+	}
+
+	err = createTables(ctx, pool)
+	if err != nil {
+		return nil, fmt.Errorf("could not create tables: %w", err)
+	}
+
+	return pool, nil
+}
+
+func createConnectionPool(ctx context.Context) (*pgxpool.Pool, error) {
 	pass := os.Getenv("DB_PASS")
 	if pass == "" {
 		return nil, fmt.Errorf("no environment variable DB_PASS")
@@ -41,20 +59,10 @@ func SetupDatabase(ctx context.Context) (*pgxpool.Pool, error) {
 	config.MaxConns = 20
 	config.MinConns = 2
 
-	pool, err := pgxpool.NewWithConfig(ctx, config)
-	if err != nil {
-		return nil, err
-	}
-
-	err = createTable(ctx, pool, tableName)
-	if err != nil {
-		return nil, err
-	}
-
-	return pool, nil
+	return pgxpool.NewWithConfig(ctx, config)
 }
 
-func createTable(ctx context.Context, pool *pgxpool.Pool, tableName string) error {
+func createTables(ctx context.Context, pool *pgxpool.Pool) error {
 	_, err := pool.Exec(ctx, fmt.Sprintf(`
 		CREATE TABLE IF NOT EXISTS %s (
 			time   TIMESTAMPTZ    NOT NULL UNIQUE,
@@ -64,17 +72,33 @@ func createTable(ctx context.Context, pool *pgxpool.Pool, tableName string) erro
 			close  DECIMAL(30,5)  NOT NULL,
 			volume DECIMAL(40,20) NOT NULL
 		)
-	`, tableName))
+	`, ohclTable))
 	if err != nil {
 		return err
 	}
 
 	_, err = pool.Exec(ctx, fmt.Sprintf(`
 		SELECT create_hypertable('%s', 'time', if_not_exists => true)
-	`, tableName))
+	`, ohclTable))
 	if err != nil {
 		return err
 	}
+
+	_, err = pool.Exec(ctx, fmt.Sprintf(`
+		CREATE MATERIALIZED VIEW %s
+		WITH (timescaledb.continuous) AS
+		SELECT
+			time_bucket('1 day', time) AS bucket,
+			AVG(close)
+		FROM
+			%s
+		GROUP BY
+			bucket
+    `, dailyAverageView, ohclTable))
+
+	_, err = pool.Exec(ctx, fmt.Sprintf(`
+		ALTER MATERIALIZED VIEW %s set (timescaledb.materialized_only = false);
+    `, dailyAverageView))
 
 	return nil
 }
@@ -85,11 +109,11 @@ func GetLatestTimestamp(ctx context.Context, conn *pgx.Conn) (int64, bool, error
 		FROM %s
 		ORDER BY time DESC
 		LIMIT 1
-	`, tableName)
+	`, ohclTable)
 
 	result, err := conn.Query(ctx, query)
 	if err != nil {
-		fmt.Fprintf(os.Stderr, "could not execute query to get latest item in %s: %s\n", tableName, err)
+		fmt.Fprintf(os.Stderr, "could not execute query to get latest item in %s: %s\n", ohclTable, err)
 		return 0, false, err
 	}
 	defer result.Close()
@@ -113,7 +137,7 @@ func GetLatestTimestamp(ctx context.Context, conn *pgx.Conn) (int64, bool, error
 func InsertDataPoints(ctx context.Context, conn *pgx.Conn, elements []api.HistoricalDataPoint) (bool, error) {
 	copyCount, err := conn.CopyFrom(
 		ctx,
-		pgx.Identifier{tableName},
+		pgx.Identifier{ohclTable},
 		[]string{"time", "open", "high", "low", "close", "volume"},
 		pgx.CopyFromSlice(len(elements), func(i int) ([]any, error) {
 			element := elements[i]

@@ -20,6 +20,27 @@ Interact
 docker exec -it timescaledb-container psql -U postgres -p 5432 -h localhost
 #+end_src
 
+*** Averages
+**** Moving
+
+#+begin_src julia
+24 * 60 / 5
+#+end_src
+
+#+RESULTS:
+: 288.0
+
+#+begin_src sql
+SELECT
+    time,
+    close,
+    AVG(close) OVER (ORDER BY time ROWS BETWEEN 288 PRECEDING AND CURRENT ROW) AS moving_average
+FROM
+    btc_5min
+ORDER BY
+    time;
+#+end_src
+
 ** Data
 
 bitstamp.com http api
