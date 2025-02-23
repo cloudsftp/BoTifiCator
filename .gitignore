@@ -7,3 +7,4 @@ tmp/
 *.zip
 
 botificator-server
+.env
