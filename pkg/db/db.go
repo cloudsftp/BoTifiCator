@@ -4,31 +4,58 @@ import (
 	"context"
 	"fmt"
 	"os"
+	"strconv"
+	"time"
+
+	"github.com/jackc/pgx/v5"
+	"github.com/jackc/pgx/v5/pgxpool"
 
 	"github.com/cloudsftp/botificator/pkg/api"
-	"github.com/jackc/pgx/v5"
 )
 
 const tableName = "btc_5min"
 
-func SetupDatabase(ctx context.Context) (*pgx.Conn, error) {
-	connStr := "postgres://postgres:mysecretpassword@localhost:5432/postgres"
+func SetupDatabase(ctx context.Context) (*pgxpool.Pool, error) {
+	pass := os.Getenv("DB_PASS")
+	if pass == "" {
+		return nil, fmt.Errorf("no environment variable DB_PASS")
+	}
 
-	conn, err := pgx.Connect(ctx, connStr)
+	host := os.Getenv("DB_HOST")
+	if host == "" {
+		return nil, fmt.Errorf("no environment variable DB_HOST")
+	}
+
+	port := os.Getenv("DB_PORT")
+	if port == "" {
+		return nil, fmt.Errorf("no environment variable DB_PORT")
+	}
+
+	connectionString := fmt.Sprintf("postgres://postgres:%s@%s:%s/postgres", pass, host, port)
+
+	config, err := pgxpool.ParseConfig(connectionString)
 	if err != nil {
 		return nil, err
 	}
 
-	err = createTable(ctx, conn, tableName)
+	config.MaxConns = 20
+	config.MinConns = 2
+
+	pool, err := pgxpool.NewWithConfig(ctx, config)
 	if err != nil {
 		return nil, err
 	}
 
-	return conn, nil
+	err = createTable(ctx, pool, tableName)
+	if err != nil {
+		return nil, err
+	}
+
+	return pool, nil
 }
 
-func createTable(ctx context.Context, conn *pgx.Conn, tableName string) error {
-	_, err := conn.Exec(ctx, fmt.Sprintf(`
+func createTable(ctx context.Context, pool *pgxpool.Pool, tableName string) error {
+	_, err := pool.Exec(ctx, fmt.Sprintf(`
 		CREATE TABLE IF NOT EXISTS %s (
 			time   TIMESTAMPTZ    NOT NULL UNIQUE,
 			open   DECIMAL(30,5)  NOT NULL,
@@ -42,7 +69,7 @@ func createTable(ctx context.Context, conn *pgx.Conn, tableName string) error {
 		return err
 	}
 
-	_, err = conn.Exec(ctx, fmt.Sprintf(`
+	_, err = pool.Exec(ctx, fmt.Sprintf(`
 		SELECT create_hypertable('%s', 'time', if_not_exists => true)
 	`, tableName))
 	if err != nil {
@@ -81,22 +108,35 @@ func GetLatestTimestamp(ctx context.Context, conn *pgx.Conn) (int64, bool, error
 	return latestTimestamp, true, nil
 }
 
-func InsertDataPoint(ctx context.Context, conn *pgx.Conn, element api.HistoricalDataPoint) error {
-	command := fmt.Sprintf(`
-		INSERT INTO %s  (time, open, high, low, close, volume)
-		VALUES (to_timestamp($1), $2, $3, $4, $5, $6)
-		ON CONFLICT (time) DO NOTHING
-	`, tableName)
+// InsertDataPoints efficiently inserts multiple data points using COPY.
+// Returns true if any rows were inserted, false otherwise.
+func InsertDataPoints(ctx context.Context, conn *pgx.Conn, elements []api.HistoricalDataPoint) (bool, error) {
+	copyCount, err := conn.CopyFrom(
+		ctx,
+		pgx.Identifier{tableName},
+		[]string{"time", "open", "high", "low", "close", "volume"},
+		pgx.CopyFromSlice(len(elements), func(i int) ([]any, error) {
+			element := elements[i]
 
-	result, err := conn.Exec(ctx, command, element.Timestamp, element.Open, element.High, element.Low, element.Close, element.Volume)
+			unixSeconds, err := strconv.ParseInt(element.Timestamp, 10, 64)
+			if err != nil {
+				return nil, err
+			}
+			timeDate := time.Unix(unixSeconds, 0)
+
+			return []any{timeDate, element.Open, element.High, element.Low, element.Close, element.Volume}, nil
+		}),
+	)
+
 	if err != nil {
-		fmt.Fprintf(os.Stderr, "could not execute query to insert row in %s: %s\n", tableName, err)
-		return err
+		fmt.Fprintf(os.Stderr, "could not execute query to insert rows: %s\n", err)
+		return false, err
 	}
 
-	if result.RowsAffected() == 0 {
-		fmt.Fprint(os.Stderr, "row not inserted, time already exists\n")
+	if copyCount == 0 {
+		fmt.Fprint(os.Stderr, "no rows inserted")
+		return false, nil
 	}
 
-	return nil
+	return true, nil
 }

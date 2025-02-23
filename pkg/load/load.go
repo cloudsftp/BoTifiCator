@@ -5,11 +5,13 @@ import (
 	"encoding/json"
 	"fmt"
 	"os"
+	"strconv"
 	"time"
 
 	"github.com/cloudsftp/botificator/pkg/api"
 	"github.com/cloudsftp/botificator/pkg/db"
 	"github.com/jackc/pgx/v5"
+	"github.com/jackc/pgx/v5/pgxpool"
 	"resty.dev/v3"
 )
 
@@ -19,36 +21,44 @@ const (
 	step = 5 * 60
 )
 
-func LoadDataIntoDatabase(ctx context.Context, client *resty.Client, conn *pgx.Conn, startTime time.Time) error {
+func LoadDataIntoDatabase(ctx context.Context, client *resty.Client, pool *pgxpool.Pool, startTime time.Time) error {
+	conn, err := pool.Acquire(ctx)
+	if err != nil {
+		return fmt.Errorf("failed to acquire connection from pool: %w", err)
+	}
+	defer conn.Release()
+
+	startTimestamp, ok, err := db.GetLatestTimestamp(ctx, conn.Conn())
+	if err != nil {
+		return fmt.Errorf("failed to get the latest timestamp: %w", err)
+	}
+	startTimestamp += step
+	if !ok {
+		startTimestamp = startTime.Unix()
+	}
+
+	currentTimestamp := startTimestamp
 	for {
-		startTimestamp, ok, err := db.GetLatestTimestamp(ctx, conn)
-		if err != nil {
-			os.Exit(1)
-		}
-		startTimestamp += step
-		if !ok {
-			startTimestamp = startTime.Unix()
-		}
+		fmt.Printf("current timestamp: %s\n", time.Unix(currentTimestamp, 0).Format(time.RFC3339))
 
-		fmt.Printf("current timestamp: %s\n", time.Unix(startTimestamp, 0).Format(time.RFC3339))
-
-		done, err := downloadData(ctx, client, conn, startTimestamp)
+		lastTimestamp, done, err := downloadData(ctx, client, conn.Conn(), currentTimestamp)
 		if err != nil {
-			fmt.Fprintf(os.Stderr, "could not get data: %s\n", err)
-			os.Exit(1)
+			return err
 		}
 
 		if done {
-			fmt.Fprint(os.Stderr, "no more new data, exiting\n")
-			os.Exit(0)
+			fmt.Println("no more new data, exiting loop")
+			return nil
 		}
+
+		currentTimestamp = lastTimestamp + step
 
 		// Try not to get rate-limited
 		time.Sleep(100 * time.Millisecond)
 	}
 }
 
-func downloadData(ctx context.Context, client *resty.Client, conn *pgx.Conn, currentTimestamp int64) (bool, error) {
+func downloadData(ctx context.Context, client *resty.Client, conn *pgx.Conn, currentTimestamp int64) (int64, bool, error) {
 	result, err := client.R().WithContext(ctx).SetQueryParams(map[string]string{
 		"step":                   fmt.Sprint(step),
 		"limit":                  "1000",
@@ -57,32 +67,34 @@ func downloadData(ctx context.Context, client *resty.Client, conn *pgx.Conn, cur
 	}).Get(bistampRootUrl + "ohlc/btcusd")
 
 	if err != nil {
-		fmt.Fprintf(os.Stderr, "Unable to connect to bitstamp: %v\n", err)
-		return false, err
+		return 0, false, fmt.Errorf("requesting data from bitstamp: %w", err)
 	}
 
 	if result.Err != nil {
-		fmt.Fprintf(os.Stderr, "Result contains error: %v\n", result.Err)
-		return false, err
+		return 0, false, fmt.Errorf("result contains error: %w", result.Err)
 	}
 
 	var data api.HistoricalDataResponseWrapper
 	err = json.NewDecoder(result.Body).Decode(&data)
 	if err != nil {
-		fmt.Fprintf(os.Stderr, "Could not decode body: %v\n", err)
-		return false, err
+		return 0, false, fmt.Errorf("could not decode body: %w", err)
 	}
 
 	if len(data.Inner.Data) == 0 {
-		return true, nil
+		return 0, true, nil
 	}
 
-	for _, point := range data.Inner.Data {
-		err = db.InsertDataPoint(ctx, conn, point)
-		if err != nil {
-			return false, err
-		}
+	elements := data.Inner.Data
+	_, err = db.InsertDataPoints(ctx, conn, elements)
+	if err != nil {
+		return 0, false, err
 	}
 
-	return false, nil
+	lastTimestampString := elements[len(elements)-1].Timestamp
+	lastTimestamp, err := strconv.ParseInt(lastTimestampString, 10, 64)
+	if err != nil {
+		return 0, false, err
+	}
+
+	return lastTimestamp, false, nil
 }
