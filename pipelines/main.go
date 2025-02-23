@@ -10,7 +10,7 @@ type BoTifiCator struct{}
 
 const (
 	GoVersion     = "1.23"
-	AlpineVersion = "3.20"
+	AlpineVersion = "3.21"
 
 	serviceName = "botificator-service"
 )
@@ -31,7 +31,7 @@ func (b *BoTifiCator) buildBaseImage(
 
 	return dag.Container().
 		From("alpine:"+AlpineVersion).
-		WithExposedPort(6670).
+		//WithExposedPort(6680).
 		WithFile("/server", executable)
 }
 
@@ -47,7 +47,7 @@ func cachedGoBuilder(
 	source *dagger.Directory,
 ) *dagger.Container {
 	return dag.Container().
-		From("golang:"+GoVersion).
+		From("golang:"+GoVersion+"-alpine"+AlpineVersion).
 
 		// Caches
 		WithMountedCache("/go/pkg/mod", dag.CacheVolume("go-mod")).
@@ -94,4 +94,28 @@ func (b *BoTifiCator) PublishImage(
 		BuildImage(ctx, source).
 		WithRegistryAuth("ghcr.io", actor, token).
 		Publish(ctx, "ghcr.io/cloudsftp/botificator-service:latest")
+}
+
+func (b *BoTifiCator) Deploy(
+	ctx context.Context,
+	host *dagger.Secret,
+	username *dagger.Secret,
+	key *dagger.Secret,
+) (string, error) {
+	usernamePlain, err := username.Plaintext(ctx)
+	if err != nil {
+		return "", err
+	}
+
+	hostPlain, err := host.Plaintext(ctx)
+	if err != nil {
+		return "", err
+	}
+
+	return NewSSH(
+		usernamePlain+"@"+hostPlain,
+		key,
+	).
+		Command("./deploy.sh").
+		Stdout(ctx)
 }
