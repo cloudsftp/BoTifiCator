@@ -15,26 +15,39 @@ const (
 	serviceName = "botificator-service"
 )
 
-func (b *BoTifiCator) BuildImage(
+// builds the service and runs all tests (none right now)
+func (b *BoTifiCator) BuildAndTestAll(
 	ctx context.Context,
 	source *dagger.Directory,
-) *dagger.Container {
-	return b.
-		buildBaseImage(source).
-		WithEntrypoint([]string{"/server"})
+) (string, error) {
+	/*
+		_, err := b.Lint(ctx, source)
+		if err != nil {
+			return "", err
+		}
+
+		_, err = b.Test(ctx, source)
+		if err != nil {
+			return "", err
+		}
+	*/
+
+	b.Build(source)
+
+	b.BuildImage(ctx, source)
+
+	/*
+		_, err := b.TestIntegration(ctx, source, mittlifeSource)
+		if err != nil {
+			return "", err
+		}
+	*/
+
+	output := "SUCCESS"
+	return output, nil
 }
 
-func (b *BoTifiCator) buildBaseImage(
-	source *dagger.Directory,
-) *dagger.Container {
-	executable := b.Build(source)
-
-	return dag.Container().
-		From("alpine:"+AlpineVersion).
-		//WithExposedPort(6680).
-		WithFile("/server", executable)
-}
-
+// builds the service executable
 func (b *BoTifiCator) Build(
 	source *dagger.Directory,
 ) *dagger.File {

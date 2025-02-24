@@ -6,6 +6,7 @@ import (
 	"context"
 )
 
+// publishes and deploys the service to the backend
 func (b *BoTifiCator) PublishAndDeploy(
 	ctx context.Context,
 	source *dagger.Directory,
@@ -28,6 +29,7 @@ func (b *BoTifiCator) PublishAndDeploy(
 	return nil
 }
 
+// publishes the image of the service to the github container registry
 func (b *BoTifiCator) PublishImage(
 	ctx context.Context,
 	source *dagger.Directory,
@@ -40,6 +42,28 @@ func (b *BoTifiCator) PublishImage(
 		Publish(ctx, "ghcr.io/cloudsftp/botificator-service:latest")
 }
 
+// builds the image of the service
+func (b *BoTifiCator) BuildImage(
+	ctx context.Context,
+	source *dagger.Directory,
+) *dagger.Container {
+	return b.
+		buildBaseImage(source).
+		WithEntrypoint([]string{"/server"})
+}
+
+func (b *BoTifiCator) buildBaseImage(
+	source *dagger.Directory,
+) *dagger.Container {
+	executable := b.Build(source)
+
+	return dag.Container().
+		From("alpine:"+AlpineVersion).
+		//WithExposedPort(6680).
+		WithFile("/server", executable)
+}
+
+// deploys the backend of the service
 func (b *BoTifiCator) Deploy(
 	ctx context.Context,
 	host *dagger.Secret,
