@@ -15,7 +15,7 @@ const (
 	serviceName = "botificator-service"
 )
 
-// builds the service and runs all tests (none right now)
+// Builds the service and runs all tests (none right now)
 func (b *BoTifiCator) BuildAndTestAll(
 	ctx context.Context,
 	source *dagger.Directory,
@@ -47,7 +47,7 @@ func (b *BoTifiCator) BuildAndTestAll(
 	return output, nil
 }
 
-// builds the service executable
+// Builds the service executable
 func (b *BoTifiCator) Build(
 	source *dagger.Directory,
 ) *dagger.File {

@@ -6,7 +6,7 @@ import (
 	"context"
 )
 
-// publishes and deploys the service to the backend
+// Publishes and deploys the service to the backend
 func (b *BoTifiCator) PublishAndDeploy(
 	ctx context.Context,
 	source *dagger.Directory,
@@ -29,7 +29,7 @@ func (b *BoTifiCator) PublishAndDeploy(
 	return nil
 }
 
-// publishes the image of the service to the github container registry
+// Publishes the image of the service to the github container registry
 func (b *BoTifiCator) PublishImage(
 	ctx context.Context,
 	source *dagger.Directory,
@@ -42,7 +42,7 @@ func (b *BoTifiCator) PublishImage(
 		Publish(ctx, "ghcr.io/cloudsftp/botificator-service:latest")
 }
 
-// builds the image of the service
+// Builds the image of the service
 func (b *BoTifiCator) BuildImage(
 	ctx context.Context,
 	source *dagger.Directory,
@@ -63,7 +63,7 @@ func (b *BoTifiCator) buildBaseImage(
 		WithFile("/server", executable)
 }
 
-// deploys the backend of the service
+// Deploys the backend of the service
 func (b *BoTifiCator) Deploy(
 	ctx context.Context,
 	host *dagger.Secret,
@@ -83,7 +83,6 @@ func (b *BoTifiCator) Deploy(
 	return NewSSH(
 		usernamePlain+"@"+hostPlain,
 		key,
-	).
-		Command("./deploy.sh").
-		Stdout(ctx)
+		AlpineVersion,
+	).Execute(ctx, "./deploy.sh")
 }
