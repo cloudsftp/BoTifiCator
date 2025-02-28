@@ -6,7 +6,6 @@ import (
 	"os"
 
 	"github.com/go-telegram/bot"
-	"github.com/go-telegram/bot/models"
 )
 
 type Notificator struct {
@@ -37,21 +36,11 @@ func New() (*Notificator, error) {
 	return &Notificator{bot, chatID}, nil
 }
 
-func (n *Notificator) Message(ctx context.Context) error {
-	msg, err := n.telegramBot.SendMessage(ctx, &bot.SendMessageParams{
-		ChatID:              n.chatID,
-		Text:                "Hello",
-		ParseMode:           "",
-		Entities:            []models.MessageEntity{},
-		LinkPreviewOptions:  &models.LinkPreviewOptions{},
-		DisableNotification: false,
-		ProtectContent:      false,
-		AllowPaidBroadcast:  false,
-		MessageEffectID:     "",
-		ReplyParameters:     &models.ReplyParameters{},
-		ReplyMarkup:         nil,
+func (n *Notificator) SendMessageDeployed(ctx context.Context) error {
+	_, err := n.telegramBot.SendMessage(ctx, &bot.SendMessageParams{
+		ChatID: n.chatID,
+		Text:   "Deployed!",
 	})
-	_ = msg
 
 	if err != nil {
 		return fmt.Errorf("could not send message: %w", err)

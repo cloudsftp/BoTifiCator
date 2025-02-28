@@ -4,11 +4,14 @@ import (
 	"context"
 	"fmt"
 	"os"
+	"sync"
 	"time"
 
 	"resty.dev/v3"
 
+	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/joho/godotenv"
+	"github.com/robfig/cron/v3"
 
 	"github.com/cloudsftp/botificator/pkg/analyzer"
 	"github.com/cloudsftp/botificator/pkg/db"
@@ -32,7 +35,12 @@ func main() {
 		fmt.Fprintf(os.Stderr, "could not create notificator: %s\n", err)
 		os.Exit(1)
 	}
-	notificator.Message(ctx)
+
+	err = notificator.SendMessageDeployed(ctx)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "could not send message: %s\n", err)
+		os.Exit(1)
+	}
 
 	pool, err := db.SetupDatabase(ctx)
 	if err != nil {
@@ -43,21 +51,62 @@ func main() {
 
 	client := resty.New()
 	defer client.Close()
-	err = load.LoadDataIntoDatabase(ctx, client, pool, startTime)
-	if err != nil {
-		fmt.Fprintf(os.Stderr, "could not load data into database: %s\n", err)
-		os.Exit(1)
-	}
 
-	averages, err := db.GetMovingAverages(ctx, pool)
-	if err != nil {
-		fmt.Fprintf(os.Stderr, "could not get moving averages: %s\n", err)
-		os.Exit(1)
-	}
+	errors := make(chan error)
+	var databaseLock *sync.RWMutex
 
-	err = analyzer.Analyze(averages)
-	if err != nil {
-		fmt.Fprintf(os.Stderr, "could not analyze averages: %s\n", err)
-		os.Exit(1)
+	c := cron.New()
+	c.AddFunc("*/15 * * * *", loadDataCron(ctx, client, pool, databaseLock, errors))
+
+	c.AddFunc("0 5 * * *", sendUpdateCron(ctx, pool, databaseLock, errors))
+
+	for {
+		select {
+		case err := <-errors:
+			fmt.Fprintf(os.Stderr, "runtime error: %s", err)
+		}
+	}
+}
+
+func loadDataCron(
+	ctx context.Context,
+	client *resty.Client,
+	pool *pgxpool.Pool,
+	databaseLock *sync.RWMutex,
+	errors chan<- error,
+) func() {
+	return func() {
+		databaseLock.Lock()
+		defer databaseLock.Unlock()
+
+		err := load.LoadDataIntoDatabase(ctx, client, pool, startTime)
+		if err != nil {
+			errors <- fmt.Errorf("could not load data into database: %s\n", err)
+		}
+	}
+}
+
+func sendUpdateCron(
+	ctx context.Context,
+	pool *pgxpool.Pool,
+	databaseLock *sync.RWMutex,
+	errors chan<- error,
+) func() {
+	return func() {
+		ok := databaseLock.TryRLock()
+		if !ok {
+			// TODO: wait for an hour, otherwise error out
+			return
+		}
+
+		averages, err := db.GetMovingAverages(ctx, pool)
+		if err != nil {
+			errors <- fmt.Errorf("could not get moving averages: %s\n", err)
+		}
+
+		err = analyzer.Analyze(averages)
+		if err != nil {
+			errors <- fmt.Errorf("could not analyze averages: %s\n", err)
+		}
 	}
 }
