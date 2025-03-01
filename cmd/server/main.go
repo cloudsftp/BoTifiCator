@@ -26,14 +26,14 @@ func main() {
 
 	server, err := NewServer(ctx)
 	if err != nil {
-		fmt.Fprintf(os.Stderr, "error in setup: %s", err)
+		fmt.Fprintf(os.Stderr, "error in setup: %s\n", err)
 		os.Exit(1)
 	}
 	defer server.Close()
 
 	err = server.Run(ctx)
 	if err != nil {
-		fmt.Fprintf(os.Stderr, "error while running: %s", err)
+		fmt.Fprintf(os.Stderr, "error while running: %s\n", err)
 		os.Exit(1)
 	}
 }
