@@ -1,9 +1,9 @@
 name: Build, publish and deploy backend
 
-on: push
-#  push:
-#    branches:
-#      - latest
+on:
+  push:
+    branches:
+      - latest
 
 jobs:
   deploy:

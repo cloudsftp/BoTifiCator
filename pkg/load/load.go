@@ -11,6 +11,7 @@ import (
 	"github.com/cloudsftp/botificator/pkg/db"
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
+	"github.com/sirupsen/logrus"
 	"resty.dev/v3"
 )
 
@@ -20,7 +21,11 @@ const (
 	step = 5 * 60
 )
 
-func LoadDataIntoDatabase(ctx context.Context, client *resty.Client, pool *pgxpool.Pool, startTime time.Time) error {
+var startTime = time.Date(2024, 6, 1, 0, 0, 0, 0, time.UTC)
+
+func LoadDataIntoDatabase(ctx context.Context, client *resty.Client, pool *pgxpool.Pool) error {
+	logrus.Debug("Updating database...")
+
 	conn, err := pool.Acquire(ctx)
 	if err != nil {
 		return fmt.Errorf("failed to acquire connection from pool: %w", err)
@@ -38,7 +43,7 @@ func LoadDataIntoDatabase(ctx context.Context, client *resty.Client, pool *pgxpo
 
 	currentTimestamp := startTimestamp
 	for {
-		fmt.Printf("current timestamp: %s\n", time.Unix(currentTimestamp, 0).Format(time.RFC3339))
+		logrus.Tracef("Currently downloading data for timestamp %s", time.Unix(currentTimestamp, 0).Format(time.RFC3339))
 
 		lastTimestamp, done, err := downloadData(ctx, client, conn.Conn(), currentTimestamp)
 		if err != nil {
@@ -46,7 +51,7 @@ func LoadDataIntoDatabase(ctx context.Context, client *resty.Client, pool *pgxpo
 		}
 
 		if done {
-			fmt.Println("no more new data, exiting loop")
+			logrus.Debug("Done updating database")
 			return nil
 		}
 
