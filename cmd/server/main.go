@@ -24,32 +24,13 @@ var startTime = time.Date(2024, 6, 1, 0, 0, 0, 0, time.UTC)
 func main() {
 	ctx := context.Background()
 
-	err := godotenv.Load()
+	notificator, pool, client, err := setup(ctx)
 	if err != nil {
-		fmt.Fprintf(os.Stderr, "could not load environment: %s\n", err)
-		os.Exit(1)
+		fmt.Fprintf(os.Stderr, "error in setup: %s", err)
 	}
+	_ = notificator
 
-	notificator, err := notificator.New()
-	if err != nil {
-		fmt.Fprintf(os.Stderr, "could not create notificator: %s\n", err)
-		os.Exit(1)
-	}
-
-	err = notificator.SendMessageDeployed(ctx)
-	if err != nil {
-		fmt.Fprintf(os.Stderr, "could not send message: %s\n", err)
-		os.Exit(1)
-	}
-
-	pool, err := db.SetupDatabase(ctx)
-	if err != nil {
-		fmt.Fprintf(os.Stderr, "could not setup database: %s\n", err)
-		os.Exit(1)
-	}
 	defer pool.Close()
-
-	client := resty.New()
 	defer client.Close()
 
 	errors := make(chan error)
@@ -66,6 +47,32 @@ func main() {
 			fmt.Fprintf(os.Stderr, "runtime error: %s", err)
 		}
 	}
+}
+
+func setup(ctx context.Context) (*notificator.Notificator, *pgxpool.Pool, *resty.Client, error) {
+	err := godotenv.Load()
+	if err != nil {
+		return nil, nil, nil, fmt.Errorf("could not load environment: %w\n", err)
+	}
+
+	notificator, err := notificator.New()
+	if err != nil {
+		return nil, nil, nil, fmt.Errorf("could not create notificator: %w\n", err)
+	}
+
+	pool, err := db.SetupDatabase(ctx)
+	if err != nil {
+		return nil, nil, nil, fmt.Errorf("could not setup database: %w\n", err)
+	}
+
+	client := resty.New()
+
+	err = notificator.SendMessageDeployed(ctx)
+	if err != nil {
+		return nil, nil, nil, fmt.Errorf("could not send message: %w\n", err)
+	}
+
+	return notificator, pool, client, nil
 }
 
 func loadDataCron(
