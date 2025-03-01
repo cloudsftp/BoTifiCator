@@ -121,10 +121,14 @@ func (s *Server) Run(ctx context.Context) error {
 }
 
 func (s *Server) UpdateDatabase(ctx context.Context) {
-	s.databaseLock.Lock()
+	ok := s.databaseLock.TryLock()
+	if !ok {
+		// TODO: warn being updated already
+		return
+	}
 	defer s.databaseLock.Unlock()
 
-	s.notificator.SendMessage(ctx, "Updating Database...")
+	// s.notificator.SendMessage(ctx, "Updating Database...")
 
 	err := load.LoadDataIntoDatabase(ctx, s.client, s.pool, startTime)
 	if err != nil {
