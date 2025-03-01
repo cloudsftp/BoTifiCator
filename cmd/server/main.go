@@ -76,9 +76,9 @@ func NewServer(ctx context.Context) (*Server, error) {
 	}
 
 	errors := make(chan error)
-	var databaseLock *sync.RWMutex
+	var databaseLock sync.RWMutex
 
-	return &Server{notificator, pool, client, scheduler, errors, databaseLock}, nil
+	return &Server{notificator, pool, client, scheduler, errors, &databaseLock}, nil
 }
 
 func (s *Server) Close() {
@@ -87,6 +87,7 @@ func (s *Server) Close() {
 }
 
 func (s *Server) Run(ctx context.Context) error {
+	s.UpdateDatabase(ctx)
 	_, err := s.scheduler.NewJob(
 		gocron.DurationJob(15*time.Minute),
 		gocron.NewTask(s.UpdateDatabase, ctx),
@@ -102,6 +103,14 @@ func (s *Server) Run(ctx context.Context) error {
 	if err != nil {
 		return fmt.Errorf("could not set up notification cron job: %w", err)
 	}
+
+	s.scheduler.Start()
+	defer func() {
+		err := s.scheduler.Shutdown()
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "could not shutdown scheduler: %s", err)
+		}
+	}()
 
 	for {
 		select {
