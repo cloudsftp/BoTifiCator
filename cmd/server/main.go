@@ -115,6 +115,8 @@ func (s *Server) UpdateDatabase(ctx context.Context) {
 	s.databaseLock.Lock()
 	defer s.databaseLock.Unlock()
 
+	s.notificator.SendMessage(ctx, "Updating Database...")
+
 	err := load.LoadDataIntoDatabase(ctx, s.client, s.pool, startTime)
 	if err != nil {
 		s.errors <- fmt.Errorf("could not load data into database: %s\n", err)

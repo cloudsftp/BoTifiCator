@@ -36,6 +36,19 @@ func New() (*Notificator, error) {
 	return &Notificator{bot, chatID}, nil
 }
 
+func (n *Notificator) SendMessage(ctx context.Context, message string) error {
+	_, err := n.telegramBot.SendMessage(ctx, &bot.SendMessageParams{
+		ChatID: n.chatID,
+		Text:   message,
+	})
+
+	if err != nil {
+		return fmt.Errorf("could not send message: %w", err)
+	}
+
+	return nil
+}
+
 func (n *Notificator) SendMessageDeployed(ctx context.Context) error {
 	_, err := n.telegramBot.SendMessage(ctx, &bot.SendMessageParams{
 		ChatID: n.chatID,
