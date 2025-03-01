@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"strconv"
+	"sync"
 	"time"
 
 	"github.com/jackc/pgx/v5"
@@ -11,7 +12,6 @@ import (
 	"github.com/sirupsen/logrus"
 	log "github.com/sirupsen/logrus"
 
-	"github.com/cloudsftp/botificator/pkg/analyzer"
 	"github.com/cloudsftp/botificator/pkg/api"
 )
 
@@ -20,8 +20,22 @@ const (
 	dailyAverageView = "btc_daily_avg"
 )
 
+type DataProvider struct {
+	pool *pgxpool.Pool
+	lock *sync.RWMutex
+}
+
+type MovingAverages struct {
+	Time    time.Time
+	Ma111   float64
+	Ma350x2 float64
+}
+
 // GetLatestTimestamp returns the timestamp of the latest row
-func GetLatestTimestamp(ctx context.Context, conn *pgx.Conn) (int64, bool, error) {
+func (d *DataProvider) GetLatestTimestamp(ctx context.Context) (int64, bool, error) {
+	d.lock.RLock()
+	defer d.lock.RUnlock()
+
 	query := fmt.Sprintf(`
 		SELECT EXTRACT(EPOCH FROM time) AS unix_seconds
 		FROM %s
@@ -29,7 +43,7 @@ func GetLatestTimestamp(ctx context.Context, conn *pgx.Conn) (int64, bool, error
 		LIMIT 1
 	`, ohclTable)
 
-	result, err := conn.Query(ctx, query)
+	result, err := d.pool.Query(ctx, query)
 	if err != nil {
 		log.Errorf("could not execute query to get latest item in %s: %s", ohclTable, err)
 		return 0, false, err
@@ -52,8 +66,11 @@ func GetLatestTimestamp(ctx context.Context, conn *pgx.Conn) (int64, bool, error
 
 // InsertDataPoints efficiently inserts multiple data points using COPY.
 // Returns true if any rows were inserted, false otherwise.
-func InsertDataPoints(ctx context.Context, conn *pgx.Conn, elements []api.HistoricalDataPoint) (bool, error) {
-	copyCount, err := conn.CopyFrom(
+func (d *DataProvider) InsertDataPoints(ctx context.Context, elements []api.HistoricalDataPoint) (bool, error) {
+	d.lock.Lock()
+	defer d.lock.Unlock()
+
+	copyCount, err := d.pool.CopyFrom(
 		ctx,
 		pgx.Identifier{ohclTable},
 		[]string{"time", "open", "high", "low", "close", "volume"},
@@ -87,7 +104,7 @@ func movingAverageSqlRange(numRows uint64) string {
 	return fmt.Sprintf("(ORDER BY day ROWS BETWEEN %d PRECEDING AND CURRENT ROW)", numRows-1)
 }
 
-func GetMovingAverages(ctx context.Context, pool *pgxpool.Pool) ([]analyzer.MovingAverages, error) {
+func (d *DataProvider) GetMovingAverages(ctx context.Context) ([]MovingAverages, error) {
 	query := fmt.Sprintf(`
 		SELECT
 			day,
@@ -102,15 +119,15 @@ func GetMovingAverages(ctx context.Context, pool *pgxpool.Pool) ([]analyzer.Movi
 		dailyAverageView,
 	)
 
-	result, err := pool.Query(ctx, query)
+	result, err := d.pool.Query(ctx, query)
 	if err != nil {
 		return nil, fmt.Errorf("could not get moving averages: %w", err)
 	}
 	defer result.Close()
 
-	var averages []analyzer.MovingAverages
+	var averages []MovingAverages
 	for result.Next() {
-		var averagesRow analyzer.MovingAverages
+		var averagesRow MovingAverages
 		err = result.Scan(&averagesRow.Time, &averagesRow.Ma111, &averagesRow.Ma350x2)
 		if err != nil {
 			return nil, fmt.Errorf("could not scan row: %w", err)

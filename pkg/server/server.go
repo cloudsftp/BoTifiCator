@@ -3,27 +3,26 @@ package server
 import (
 	"context"
 	"fmt"
-	"sync"
 	"time"
+
+	"resty.dev/v3"
+
+	"github.com/go-co-op/gocron/v2"
+	"github.com/joho/godotenv"
+	"github.com/sirupsen/logrus"
 
 	"github.com/cloudsftp/botificator/pkg/analyzer"
 	"github.com/cloudsftp/botificator/pkg/db"
 	"github.com/cloudsftp/botificator/pkg/load"
 	"github.com/cloudsftp/botificator/pkg/notificator"
-	"github.com/go-co-op/gocron/v2"
-	"github.com/jackc/pgx/v5/pgxpool"
-	"github.com/joho/godotenv"
-	"github.com/sirupsen/logrus"
-	"resty.dev/v3"
 )
 
 type Server struct {
 	notificator  *notificator.Notificator
-	pool         *pgxpool.Pool
+	dataProvider *db.DataProvider
 	client       *resty.Client
 	scheduler    gocron.Scheduler
 	errors       chan error
-	databaseLock *sync.RWMutex
 }
 
 func New(ctx context.Context) (*Server, error) {
@@ -37,7 +36,7 @@ func New(ctx context.Context) (*Server, error) {
 		return nil, fmt.Errorf("could not create notificator: %w", err)
 	}
 
-	pool, err := db.SetupDatabase(ctx)
+	dataProvider, err := db.New(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("could not setup database: %w", err)
 	}
@@ -55,14 +54,13 @@ func New(ctx context.Context) (*Server, error) {
 	}
 
 	errors := make(chan error)
-	var databaseLock sync.RWMutex
 
-	return &Server{notificator, pool, client, scheduler, errors, &databaseLock}, nil
+	return &Server{notificator, dataProvider, client, scheduler, errors}, nil
 }
 
 func (s *Server) Close() {
-	s.pool.Close()
 	s.client.Close()
+	s.dataProvider.Close()
 }
 
 func (s *Server) Run(ctx context.Context) error {
@@ -100,14 +98,7 @@ func (s *Server) Run(ctx context.Context) error {
 }
 
 func (s *Server) UpdateDatabase(ctx context.Context) {
-	ok := s.databaseLock.TryLock()
-	if !ok {
-		// TODO: warn being updated already
-		return
-	}
-	defer s.databaseLock.Unlock()
-
-	err := load.LoadDataIntoDatabase(ctx, s.client, s.pool)
+	err := load.LoadDataIntoDatabase(ctx, s.client, s.dataProvider)
 	if err != nil {
 		s.errors <- fmt.Errorf("could not load data into database: %s", err)
 	}
@@ -116,20 +107,9 @@ func (s *Server) UpdateDatabase(ctx context.Context) {
 }
 
 func (s *Server) SendUpdate(ctx context.Context) {
-	ok := s.databaseLock.TryRLock()
-	if !ok {
-		// TODO: wait for an hour, otherwise error out
-		return
-	}
-	defer s.databaseLock.RUnlock()
-
-	averages, err := db.GetMovingAverages(ctx, s.pool)
-	if err != nil {
-		s.errors <- fmt.Errorf("could not get moving averages: %s", err)
-	}
-
-	err = analyzer.Analyze(averages)
+	report, err := analyzer.Analyze(ctx, s.dataProvider)
 	if err != nil {
 		s.errors <- fmt.Errorf("could not analyze averages: %s", err)
 	}
+	_ = report
 }
