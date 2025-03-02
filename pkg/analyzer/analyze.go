@@ -24,7 +24,7 @@ func (d *DailyReport) PiCycleTopDifferencePercent() float64 {
 }
 
 func Analyze(ctx context.Context, dataProvider *db.DataProvider) ([]DailyReport, error) {
-	movingAverages, err := dataProvider.GetMovingAverages(3, ctx)
+	movingAverages, err := dataProvider.GetMovingAverages(ctx, 3)
 	if err != nil {
 		return nil, fmt.Errorf("could not get moving averages: %w", err)
 	}

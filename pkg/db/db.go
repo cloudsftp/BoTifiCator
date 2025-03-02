@@ -36,7 +36,7 @@ func (d *DataProvider) GetLatestTimestamp(ctx context.Context) (int64, bool, err
 	var latestTimestamp int64
 	err := row.Scan(&latestTimestamp)
 	if err != nil {
-		return 0, false, fmt.Errorf("could not execute query to get values from result: %s", err)
+		return 0, false, fmt.Errorf("could not execute query to get values from result: %w", err)
 	}
 
 	return latestTimestamp, true, nil
@@ -63,7 +63,7 @@ func (d *DataProvider) InsertDataPoints(ctx context.Context, elements []api.Hist
 	)
 
 	if err != nil {
-		return false, fmt.Errorf("could not execute query to insert rows: %s", err)
+		return false, fmt.Errorf("could not execute query to insert rows: %w", err)
 	}
 
 	if copyCount == 0 {
@@ -85,7 +85,7 @@ func movingAverageSqlRange(numRows uint64) string {
 	return fmt.Sprintf("(ORDER BY day DESC ROWS BETWEEN CURRENT ROW AND %d FOLLOWING)", numRows-1)
 }
 
-func (d *DataProvider) GetMovingAverages(limit uint, ctx context.Context) ([]MovingAverages, error) {
+func (d *DataProvider) GetMovingAverages(ctx context.Context, limit uint) ([]MovingAverages, error) {
 	query := fmt.Sprintf(`
 		SELECT
 			day,
