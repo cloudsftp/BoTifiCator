@@ -1,17 +1,38 @@
 package analyzer
 
 import (
-	"time"
+	"context"
+	"fmt"
+
+	"github.com/cloudsftp/botificator/pkg/db"
 )
 
-type MovingAverages struct {
-	Time    time.Time
-	Ma111   float64
-	Ma350x2 float64
+type DailyReport struct {
+	averages *db.MovingAverages
 }
 
-func Analyze(averages []MovingAverages) error {
-	// TODO
+func (d *DailyReport) DayString() string {
+	return d.averages.Day.Format("2006-01-02")
+}
 
-	return nil
+func (d *DailyReport) PiCycleTopDifference() float64 {
+	return d.averages.MovingAverage350x2 - d.averages.MovingAverage111
+}
+
+func (d *DailyReport) PiCycleTopDifferencePercent() float64 {
+	return d.PiCycleTopDifference() / d.averages.DailyAverage * 100.
+}
+
+func Analyze(ctx context.Context, dataProvider *db.DataProvider) ([]DailyReport, error) {
+	movingAverages, err := dataProvider.GetMovingAverages(ctx, 3)
+	if err != nil {
+		return nil, fmt.Errorf("could not get moving averages: %w", err)
+	}
+
+	var reports []DailyReport
+	for _, averages := range movingAverages {
+		reports = append(reports, DailyReport{&averages})
+	}
+
+	return reports, nil
 }

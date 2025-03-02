@@ -9,8 +9,7 @@ import (
 
 	"github.com/cloudsftp/botificator/pkg/api"
 	"github.com/cloudsftp/botificator/pkg/db"
-	"github.com/jackc/pgx/v5"
-	"github.com/jackc/pgx/v5/pgxpool"
+	"github.com/sirupsen/logrus"
 	"resty.dev/v3"
 )
 
@@ -20,14 +19,12 @@ const (
 	step = 5 * 60
 )
 
-func LoadDataIntoDatabase(ctx context.Context, client *resty.Client, pool *pgxpool.Pool, startTime time.Time) error {
-	conn, err := pool.Acquire(ctx)
-	if err != nil {
-		return fmt.Errorf("failed to acquire connection from pool: %w", err)
-	}
-	defer conn.Release()
+var startTime = time.Date(2024, 6, 1, 0, 0, 0, 0, time.UTC)
 
-	startTimestamp, ok, err := db.GetLatestTimestamp(ctx, conn.Conn())
+func LoadDataIntoDatabase(ctx context.Context, client *resty.Client, dataProvider *db.DataProvider) error {
+	logrus.Debug("Updating database...")
+
+	startTimestamp, ok, err := dataProvider.GetLatestTimestamp(ctx)
 	if err != nil {
 		return fmt.Errorf("failed to get the latest timestamp: %w", err)
 	}
@@ -38,15 +35,15 @@ func LoadDataIntoDatabase(ctx context.Context, client *resty.Client, pool *pgxpo
 
 	currentTimestamp := startTimestamp
 	for {
-		fmt.Printf("current timestamp: %s\n", time.Unix(currentTimestamp, 0).Format(time.RFC3339))
+		logrus.Tracef("Currently downloading data for timestamp %s", time.Unix(currentTimestamp, 0).Format(time.RFC3339))
 
-		lastTimestamp, done, err := downloadData(ctx, client, conn.Conn(), currentTimestamp)
+		lastTimestamp, done, err := downloadData(ctx, client, dataProvider, currentTimestamp)
 		if err != nil {
 			return err
 		}
 
 		if done {
-			fmt.Println("no more new data, exiting loop")
+			logrus.Debug("Done updating database")
 			return nil
 		}
 
@@ -57,7 +54,7 @@ func LoadDataIntoDatabase(ctx context.Context, client *resty.Client, pool *pgxpo
 	}
 }
 
-func downloadData(ctx context.Context, client *resty.Client, conn *pgx.Conn, currentTimestamp int64) (int64, bool, error) {
+func downloadData(ctx context.Context, client *resty.Client, dataProvider *db.DataProvider, currentTimestamp int64) (int64, bool, error) {
 	result, err := client.R().WithContext(ctx).SetQueryParams(map[string]string{
 		"step":                   fmt.Sprint(step),
 		"limit":                  "1000",
@@ -84,7 +81,7 @@ func downloadData(ctx context.Context, client *resty.Client, conn *pgx.Conn, cur
 	}
 
 	elements := data.Inner.Data
-	_, err = db.InsertDataPoints(ctx, conn, elements)
+	_, err = dataProvider.InsertDataPoints(ctx, elements)
 	if err != nil {
 		return 0, false, err
 	}
