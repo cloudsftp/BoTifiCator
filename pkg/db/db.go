@@ -95,7 +95,7 @@ func (d *DataProvider) InsertDataPoints(ctx context.Context, elements []api.Hist
 }
 
 func movingAverageSqlRange(numRows uint64) string {
-	return fmt.Sprintf("(ORDER BY day ROWS BETWEEN %d PRECEDING AND CURRENT ROW)", numRows-1)
+	return fmt.Sprintf("(ORDER BY day DESC ROWS BETWEEN CURRENT ROW AND %d FOLLOWING)", numRows-1)
 }
 
 type MovingAverages struct {
@@ -121,8 +121,6 @@ func (d *DataProvider) GetMovingAverages(limit uint, ctx context.Context) ([]Mov
 		dailyAverageView,
 		limit,
 	)
-
-	logrus.Debug(query)
 
 	result, err := d.pool.Query(ctx, query)
 	if err != nil {

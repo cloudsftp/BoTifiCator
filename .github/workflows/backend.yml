@@ -1,20 +1,11 @@
 name: Build, publish and deploy backend
 
-on:
-  push:
-    branches:
-      - latest
+on: push
 
 jobs:
-  deploy:
-    name: Build, publish and deploy backend
+  test-and-build:
+    name: Test and Build Backend
     runs-on: ubuntu-latest
-
-    permissions:
-      packages: write
-      contents: read
-      attestations: write
-      id-token: write
 
     steps:
       - uses: actions/checkout@v4
@@ -26,6 +17,24 @@ jobs:
           verb: call
           args: build-and-test-all --source=.
           cloud-token: ${{ secrets.DAGGER_CLOUD_TOKEN }}
+
+  deploy:
+    name: Build, publish and deploy backend
+    runs-on: ubuntu-latest
+
+    needs:
+      - test-and-build
+
+    if: github.event_name == 'push' && contains(github.ref_name, 'latest')
+
+    permissions:
+      packages: write
+      contents: read
+      attestations: write
+      id-token: write
+
+    steps:
+      - uses: actions/checkout@v4
 
       - name: Deploy
         uses: dagger/dagger-for-github@v6
