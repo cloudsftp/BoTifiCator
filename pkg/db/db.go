@@ -31,19 +31,10 @@ func (d *DataProvider) GetLatestTimestamp(ctx context.Context) (int64, bool, err
 		LIMIT 1
 	`, ohclTable)
 
-	result, err := d.pool.Query(ctx, query)
-	if err != nil {
-		logrus.Errorf("could not execute query to get latest item in %s: %s", ohclTable, err)
-		return 0, false, err
-	}
-	defer result.Close()
-
-	if !result.Next() {
-		return 0, false, nil
-	}
+	row := d.pool.QueryRow(ctx, query)
 
 	var latestTimestamp int64
-	err = result.Scan(&latestTimestamp)
+	err := row.Scan(&latestTimestamp)
 	if err != nil {
 		logrus.Errorf("could not execute query to get values from result: %s", err)
 		return 0, false, err
@@ -73,12 +64,11 @@ func (d *DataProvider) InsertDataPoints(ctx context.Context, elements []api.Hist
 	)
 
 	if err != nil {
-		logrus.Errorf("could not execute query to insert rows: %s", err)
-		return false, err
+		return false, fmt.Errorf("could not execute query to insert rows: %s", err)
 	}
 
 	if copyCount == 0 {
-		logrus.Error("no rows inserted")
+		logrus.Warn("no rows inserted")
 		return false, nil
 	}
 
