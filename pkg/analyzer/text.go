@@ -3,6 +3,7 @@ package analyzer
 import (
 	"fmt"
 	"strconv"
+	"strings"
 
 	"github.com/go-telegram/bot"
 )
@@ -10,44 +11,50 @@ import (
 func (d *DailyReport) Markdown(title string) string {
 	heading := bot.EscapeMarkdown(fmt.Sprintf("%s (%s)", title, d.DayString()))
 
-	content := bot.EscapeMarkdown(fmt.Sprintf(`
-  MA 350x2:  %s
-  MA 111:    %s
-  Gap:       %s
+	numberWidth := 12
 
-  Average:   %s
-  Gap:       %s%%
+	content := bot.EscapeMarkdown(fmt.Sprintf(`
+MA 350x2:  %s
+MA 111:    %s
+Gap:       %s
+
+Average:   %s
+Gap:       %s%%
 `,
-		formatNumber(d.averages.MovingAverage350x2),
-		formatNumber(d.averages.MovingAverage111),
-		formatNumber(d.PiCycleTopDifference()),
-		formatNumber(d.averages.DailyAverage),
-		formatNumber(d.PiCycleTopDifferencePercent()),
+		formatNumber(d.averages.MovingAverage350x2, numberWidth),
+		formatNumber(d.averages.MovingAverage111, numberWidth),
+		formatNumber(d.PiCycleTopDifference(), numberWidth),
+		formatNumber(d.averages.DailyAverage, numberWidth),
+		formatNumber(d.PiCycleTopDifferencePercent(), numberWidth),
 	))
 
 	return fmt.Sprintf("*%s*\n\n```%s```", heading, content)
 }
 
-func formatNumber(f float64) string {
-	placesAfterDot := 2
+func formatNumber(f float64, width int) string {
+	numDigitsRight := 2
 
-	s := strconv.FormatFloat(f, 'f', placesAfterDot, 64)
-	b := []byte(s)
-	length := len(b)
+	fString := strconv.FormatFloat(f, 'f', numDigitsRight, 64)
+	numDigitsLeft := len(fString) - numDigitsRight - 1
+	numCommas := (numDigitsLeft - 1) / 3
 
-	if length <= 3+1+placesAfterDot {
-		return s
+	var result strings.Builder
+
+	numSpaces := max(0, width-(len(fString)+numCommas))
+	for i := 0; i < numSpaces; i++ {
+		result.WriteRune(' ')
 	}
-
-	result := b[length-(placesAfterDot+1) : length]
 
 	j := 0
-	for i := length - (1 + placesAfterDot + 1); i >= 0; i-- {
-		if j%3 == 0 && j != 0 {
-			result = append([]byte{','}, result...)
+	for i := numDigitsLeft; i > 0; i-- {
+		if i%3 == 0 && i != numDigitsLeft {
+			result.WriteRune(',')
 		}
-		result = append([]byte{b[i]}, result...)
-		j++
+		result.WriteByte(fString[j])
+		j += 1
 	}
-	return string(result)
+
+	result.WriteString(fString[j:])
+
+	return result.String()
 }

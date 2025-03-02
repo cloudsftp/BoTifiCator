@@ -65,7 +65,6 @@ func (s *Server) Close() {
 
 func (s *Server) Run(ctx context.Context) error {
 	s.UpdateDatabase(ctx)
-	s.SendUpdate(ctx)
 	_, err := s.scheduler.NewJob(
 		gocron.DurationJob(15*time.Minute),
 		gocron.NewTask(s.UpdateDatabase, ctx),
@@ -94,7 +93,7 @@ func (s *Server) Run(ctx context.Context) error {
 		select {
 		case err := <-s.errors:
 			logrus.Errorf("runtime error: %s", err)
-		case <-ctx.Done():
+		case <-ctx.Done(): // TODO: remove when other cases are added
 			logrus.Error("context done")
 		}
 	}
