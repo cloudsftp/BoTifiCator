@@ -5,7 +5,9 @@ import (
 	"fmt"
 	"os"
 
+	"github.com/cloudsftp/botificator/pkg/analyzer"
 	"github.com/go-telegram/bot"
+	"github.com/go-telegram/bot/models"
 )
 
 type Notificator struct {
@@ -38,8 +40,9 @@ func New() (*Notificator, error) {
 
 func (n *Notificator) SendMessage(ctx context.Context, message string) error {
 	_, err := n.telegramBot.SendMessage(ctx, &bot.SendMessageParams{
-		ChatID: n.chatID,
-		Text:   message,
+		ChatID:    n.chatID,
+		Text:      message,
+		ParseMode: models.ParseModeMarkdown,
 	})
 
 	if err != nil {
@@ -57,6 +60,21 @@ func (n *Notificator) SendMessageDeployed(ctx context.Context) error {
 
 	if err != nil {
 		return fmt.Errorf("could not send message: %w", err)
+	}
+
+	return nil
+}
+
+func (n *Notificator) SendDailyReports(
+	ctx context.Context,
+	reports []analyzer.DailyReport,
+) error {
+	yesterday := reports[0]
+	message := yesterday.Markdown("Yesterday")
+
+	err := n.SendMessage(ctx, message)
+	if err != nil {
+		return fmt.Errorf("could not send markdown of daily report: %w", err)
 	}
 
 	return nil

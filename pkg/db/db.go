@@ -25,12 +25,6 @@ type DataProvider struct {
 	lock *sync.RWMutex
 }
 
-type MovingAverages struct {
-	Time    time.Time
-	Ma111   float64
-	Ma350x2 float64
-}
-
 // GetLatestTimestamp returns the timestamp of the latest row
 func (d *DataProvider) GetLatestTimestamp(ctx context.Context) (int64, bool, error) {
 	d.lock.RLock()
@@ -104,20 +98,31 @@ func movingAverageSqlRange(numRows uint64) string {
 	return fmt.Sprintf("(ORDER BY day ROWS BETWEEN %d PRECEDING AND CURRENT ROW)", numRows-1)
 }
 
-func (d *DataProvider) GetMovingAverages(ctx context.Context) ([]MovingAverages, error) {
+type MovingAverages struct {
+	Time               time.Time
+	DailyAverage       float64
+	MovingAverage111   float64
+	MovingAverage350x2 float64
+}
+
+func (d *DataProvider) GetMovingAverages(limit uint, ctx context.Context) ([]MovingAverages, error) {
 	query := fmt.Sprintf(`
 		SELECT
 			day,
+			average,
 			avg(average) over %s AS ma111,
 			2 * avg(average) over %s AS ma350x2
 		FROM %s
 		ORDER BY day DESC
-		LIMIT 14;
+		LIMIT %d;
     `,
 		movingAverageSqlRange(111),
 		movingAverageSqlRange(350),
 		dailyAverageView,
+		limit,
 	)
+
+	logrus.Debug(query)
 
 	result, err := d.pool.Query(ctx, query)
 	if err != nil {
@@ -127,13 +132,18 @@ func (d *DataProvider) GetMovingAverages(ctx context.Context) ([]MovingAverages,
 
 	var averages []MovingAverages
 	for result.Next() {
-		var averagesRow MovingAverages
-		err = result.Scan(&averagesRow.Time, &averagesRow.Ma111, &averagesRow.Ma350x2)
+		var row MovingAverages
+		err = result.Scan(
+			&row.Time,
+			&row.DailyAverage,
+			&row.MovingAverage111,
+			&row.MovingAverage350x2,
+		)
 		if err != nil {
 			return nil, fmt.Errorf("could not scan row: %w", err)
 		}
 
-		averages = append(averages, averagesRow)
+		averages = append(averages, row)
 	}
 
 	return averages, nil

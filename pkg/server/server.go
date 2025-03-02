@@ -65,6 +65,7 @@ func (s *Server) Close() {
 
 func (s *Server) Run(ctx context.Context) error {
 	s.UpdateDatabase(ctx)
+	s.SendUpdate(ctx)
 	_, err := s.scheduler.NewJob(
 		gocron.DurationJob(15*time.Minute),
 		gocron.NewTask(s.UpdateDatabase, ctx),
@@ -93,6 +94,8 @@ func (s *Server) Run(ctx context.Context) error {
 		select {
 		case err := <-s.errors:
 			logrus.Errorf("runtime error: %s", err)
+		case <-ctx.Done():
+			logrus.Error("context done")
 		}
 	}
 }
@@ -107,9 +110,13 @@ func (s *Server) UpdateDatabase(ctx context.Context) {
 }
 
 func (s *Server) SendUpdate(ctx context.Context) {
-	report, err := analyzer.Analyze(ctx, s.dataProvider)
+	reports, err := analyzer.Analyze(ctx, s.dataProvider)
 	if err != nil {
-		s.errors <- fmt.Errorf("could not analyze averages: %s", err)
+		s.errors <- fmt.Errorf("could not generate daily reports: %s", err)
 	}
-	_ = report
+
+	err = s.notificator.SendDailyReports(ctx, reports)
+	if err != nil {
+		s.errors <- fmt.Errorf("could not send daily reports: %s", err)
+	}
 }

@@ -20,19 +20,17 @@ func (b *BoTifiCator) BuildAndTestAll(
 	ctx context.Context,
 	source *dagger.Directory,
 ) (string, error) {
-	/*
-		_, err := b.Lint(ctx, source)
-		if err != nil {
-			return "", err
-		}
-
-		_, err = b.Test(ctx, source)
-		if err != nil {
-			return "", err
-		}
-	*/
+	_, err := b.Lint(ctx, source)
+	if err != nil {
+		return "", err
+	}
 
 	b.Build(source)
+
+	_, err = b.Test(ctx, source)
+	if err != nil {
+		return "", err
+	}
 
 	b.BuildImage(ctx, source)
 
@@ -47,6 +45,13 @@ func (b *BoTifiCator) BuildAndTestAll(
 	return output, nil
 }
 
+// Runs a linter
+func (b *BoTifiCator) Lint(ctx context.Context, source *dagger.Directory) (string, error) {
+	return cachedGoBuilder(source).
+		WithExec([]string{"golangci-lint", "run"}).
+		Stdout(ctx)
+}
+
 // Builds the service executable
 func (b *BoTifiCator) Build(
 	source *dagger.Directory,
@@ -55,6 +60,18 @@ func (b *BoTifiCator) Build(
 		WithExec([]string{"go", "build", "-o", serviceName, "./cmd/server"}).
 		File(serviceName)
 }
+
+// Runs unit tests
+func (b *BoTifiCator) Test(
+	ctx context.Context,
+	source *dagger.Directory,
+) (string, error) {
+	return cachedGoBuilder(source).
+		WithExec([]string{"go", "test", "./..."}).
+		Stdout(ctx)
+}
+
+const golangciLintURL = "github.com/golangci/golangci-lint/cmd/golangci-lint@latest"
 
 func cachedGoBuilder(
 	source *dagger.Directory,
@@ -67,6 +84,9 @@ func cachedGoBuilder(
 		WithEnvVariable("GOMODCACHE", "/go/pkg/mod").
 		WithMountedCache("/go/build-cache", dag.CacheVolume("go-build")).
 		WithEnvVariable("GOCACHE", "/go/build-cache").
+
+		// Linter
+		WithExec([]string{"go", "install", golangciLintURL}).
 
 		// Source code
 		WithDirectory("/src", source).
