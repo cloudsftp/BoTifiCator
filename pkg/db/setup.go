@@ -4,7 +4,6 @@ import (
 	"context"
 	"fmt"
 	"os"
-	"sync"
 
 	"github.com/jackc/pgx/v5/pgxpool"
 )
@@ -24,8 +23,7 @@ func New(ctx context.Context) (*DataProvider, error) {
 		return nil, fmt.Errorf("could not create tables: %w", err)
 	}
 
-	lock := &sync.RWMutex{}
-	return &DataProvider{pool, lock}, nil
+	return &DataProvider{pool}, nil
 }
 
 func createConnectionPool(ctx context.Context) (*pgxpool.Pool, error) {

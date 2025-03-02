@@ -4,7 +4,6 @@ import (
 	"context"
 	"fmt"
 	"strconv"
-	"sync"
 	"time"
 
 	"github.com/jackc/pgx/v5"
@@ -21,14 +20,10 @@ const (
 
 type DataProvider struct {
 	pool *pgxpool.Pool
-	lock *sync.RWMutex
 }
 
 // GetLatestTimestamp returns the timestamp of the latest row
 func (d *DataProvider) GetLatestTimestamp(ctx context.Context) (int64, bool, error) {
-	d.lock.RLock()
-	defer d.lock.RUnlock()
-
 	query := fmt.Sprintf(`
 		SELECT EXTRACT(EPOCH FROM time) AS unix_seconds
 		FROM %s
@@ -60,9 +55,6 @@ func (d *DataProvider) GetLatestTimestamp(ctx context.Context) (int64, bool, err
 // InsertDataPoints efficiently inserts multiple data points using COPY.
 // Returns true if any rows were inserted, false otherwise.
 func (d *DataProvider) InsertDataPoints(ctx context.Context, elements []api.HistoricalDataPoint) (bool, error) {
-	d.lock.Lock()
-	defer d.lock.Unlock()
-
 	copyCount, err := d.pool.CopyFrom(
 		ctx,
 		pgx.Identifier{ohclTable},
@@ -105,9 +97,6 @@ func movingAverageSqlRange(numRows uint64) string {
 }
 
 func (d *DataProvider) GetMovingAverages(limit uint, ctx context.Context) ([]MovingAverages, error) {
-	d.lock.RLock()
-	defer d.lock.RUnlock()
-
 	query := fmt.Sprintf(`
 		SELECT
 			day,
