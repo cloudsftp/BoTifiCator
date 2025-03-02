@@ -93,15 +93,18 @@ func (s *Server) Run(ctx context.Context) error {
 		}
 	}()
 
+loop:
 	for {
 		select {
 		case err := <-s.errors:
 			logrus.Errorf("runtime error: %s", err)
 		case <-ctx.Done(): // TODO: remove when other cases are added
 			logrus.Error("context done")
-			break
+			break loop
 		}
 	}
+
+	return nil
 }
 
 func (s *Server) UpdateDatabase(ctx context.Context) {

@@ -93,10 +93,6 @@ func (d *DataProvider) InsertDataPoints(ctx context.Context, elements []api.Hist
 	return true, nil
 }
 
-func movingAverageSqlRange(numRows uint64) string {
-	return fmt.Sprintf("(ORDER BY day DESC ROWS BETWEEN CURRENT ROW AND %d FOLLOWING)", numRows-1)
-}
-
 type MovingAverages struct {
 	Time               time.Time
 	DailyAverage       float64
@@ -104,7 +100,14 @@ type MovingAverages struct {
 	MovingAverage350x2 float64
 }
 
+func movingAverageSqlRange(numRows uint64) string {
+	return fmt.Sprintf("(ORDER BY day DESC ROWS BETWEEN CURRENT ROW AND %d FOLLOWING)", numRows-1)
+}
+
 func (d *DataProvider) GetMovingAverages(limit uint, ctx context.Context) ([]MovingAverages, error) {
+	d.lock.RLock()
+	defer d.lock.RUnlock()
+
 	query := fmt.Sprintf(`
 		SELECT
 			day,
