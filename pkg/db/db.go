@@ -36,8 +36,7 @@ func (d *DataProvider) GetLatestTimestamp(ctx context.Context) (int64, bool, err
 	var latestTimestamp int64
 	err := row.Scan(&latestTimestamp)
 	if err != nil {
-		logrus.Errorf("could not execute query to get values from result: %s", err)
-		return 0, false, err
+		return 0, false, fmt.Errorf("could not execute query to get values from result: %s", err)
 	}
 
 	return latestTimestamp, true, nil
@@ -76,7 +75,7 @@ func (d *DataProvider) InsertDataPoints(ctx context.Context, elements []api.Hist
 }
 
 type MovingAverages struct {
-	Time               time.Time
+	Day                time.Time
 	DailyAverage       float64
 	MovingAverage111   float64
 	MovingAverage350x2 float64
@@ -113,7 +112,7 @@ func (d *DataProvider) GetMovingAverages(limit uint, ctx context.Context) ([]Mov
 	for result.Next() {
 		var row MovingAverages
 		err = result.Scan(
-			&row.Time,
+			&row.Day,
 			&row.DailyAverage,
 			&row.MovingAverage111,
 			&row.MovingAverage350x2,
