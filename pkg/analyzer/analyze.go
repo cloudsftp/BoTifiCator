@@ -12,7 +12,7 @@ type DailyReport struct {
 }
 
 func (d *DailyReport) DayString() string {
-	return d.averages.Time.Format("2006-01-02")
+	return d.averages.Day.Format("2006-01-02")
 }
 
 func (d *DailyReport) PiCycleTopDifference() float64 {
