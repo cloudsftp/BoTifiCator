@@ -69,6 +69,10 @@ func (n *Notificator) SendDailyReports(
 	ctx context.Context,
 	reports []analyzer.DailyReport,
 ) error {
+	if len(reports) == 0 {
+		return fmt.Errorf("no reports to send")
+	}
+
 	yesterday := reports[0]
 	message := yesterday.Markdown("Yesterday")
 

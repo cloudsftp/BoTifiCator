@@ -13,6 +13,9 @@ const (
 	AlpineVersion = "3.21"
 
 	serviceName = "botificator-service"
+
+	golangciVersion = "v1.64"
+	golangciLintURL = "github.com/golangci/golangci-lint/cmd/golangci-lint@" + golangciVersion
 )
 
 // Builds the service and runs all tests (none right now)
@@ -70,8 +73,6 @@ func (b *BoTifiCator) Test(
 		WithExec([]string{"go", "test", "./..."}).
 		Stdout(ctx)
 }
-
-const golangciLintURL = "github.com/golangci/golangci-lint/cmd/golangci-lint@latest"
 
 func cachedGoBuilder(
 	source *dagger.Directory,

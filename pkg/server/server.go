@@ -59,7 +59,11 @@ func New(ctx context.Context) (*Server, error) {
 }
 
 func (s *Server) Close() {
-	s.client.Close()
+	err := s.client.Close()
+	if err != nil {
+		s.errors <- fmt.Errorf("could not close client: %w", err)
+	}
+
 	s.dataProvider.Close()
 }
 
@@ -95,6 +99,7 @@ func (s *Server) Run(ctx context.Context) error {
 			logrus.Errorf("runtime error: %s", err)
 		case <-ctx.Done(): // TODO: remove when other cases are added
 			logrus.Error("context done")
+			break
 		}
 	}
 }
@@ -113,6 +118,8 @@ func (s *Server) SendUpdate(ctx context.Context) {
 	if err != nil {
 		s.errors <- fmt.Errorf("could not generate daily reports: %s", err)
 	}
+
+	logrus.Debug("generated reports successfully")
 
 	err = s.notificator.SendDailyReports(ctx, reports)
 	if err != nil {

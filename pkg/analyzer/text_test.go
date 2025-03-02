@@ -6,7 +6,7 @@ import (
 )
 
 func TestFormatNumber(t *testing.T) {
-	test_cases := []struct {
+	testCases := []struct {
 		name     string
 		number   float64
 		width    int
@@ -61,11 +61,11 @@ func TestFormatNumber(t *testing.T) {
 		},
 	}
 
-	for _, test_case := range test_cases {
-		actual := formatNumber(test_case.number, test_case.width)
+	for _, testCase := range testCases {
+		actual := formatNumber(testCase.number, testCase.width)
 		assert.Equal(
-			t, test_case.expected, actual,
-			"in test case '%s'", test_case.name,
+			t, testCase.expected, actual,
+			"in test case '%s'", testCase.name,
 		)
 	}
 }

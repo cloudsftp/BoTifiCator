@@ -10,7 +10,6 @@ import (
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/sirupsen/logrus"
-	log "github.com/sirupsen/logrus"
 
 	"github.com/cloudsftp/botificator/pkg/api"
 )
@@ -39,7 +38,7 @@ func (d *DataProvider) GetLatestTimestamp(ctx context.Context) (int64, bool, err
 
 	result, err := d.pool.Query(ctx, query)
 	if err != nil {
-		log.Errorf("could not execute query to get latest item in %s: %s", ohclTable, err)
+		logrus.Errorf("could not execute query to get latest item in %s: %s", ohclTable, err)
 		return 0, false, err
 	}
 	defer result.Close()
