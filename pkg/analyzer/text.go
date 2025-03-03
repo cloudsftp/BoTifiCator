@@ -16,16 +16,15 @@ func (d *DailyReport) Markdown(title string) string {
 	content := bot.EscapeMarkdown(fmt.Sprintf(`
 MA 350x2:  %s
 MA 111:    %s
-Gap:       %s
+Gap:       %s (%s%%)
 
 Average:   %s
-Gap:       %s%%
 `,
 		formatNumber(d.averages.MovingAverage350x2, numberWidth),
 		formatNumber(d.averages.MovingAverage111, numberWidth),
 		formatNumber(d.PiCycleTopDifference(), numberWidth),
+		formatNumber(d.PiCycleTopDifferencePercent(), 0),
 		formatNumber(d.averages.DailyAverage, numberWidth),
-		formatNumber(d.PiCycleTopDifferencePercent(), numberWidth),
 	))
 
 	return fmt.Sprintf("*%s*\n\n```%s```", heading, content)

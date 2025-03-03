@@ -20,7 +20,7 @@ func (d *DailyReport) PiCycleTopDifference() float64 {
 }
 
 func (d *DailyReport) PiCycleTopDifferencePercent() float64 {
-	return d.PiCycleTopDifference() / d.averages.DailyAverage * 100.
+	return d.PiCycleTopDifference() / d.averages.MovingAverage111 * 100.
 }
 
 func Analyze(ctx context.Context, dataProvider *db.DataProvider) ([]DailyReport, error) {
