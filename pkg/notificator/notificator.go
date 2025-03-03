@@ -54,8 +54,9 @@ func (n *Notificator) SendMessage(ctx context.Context, message string) error {
 
 func (n *Notificator) SendMessageDeployed(ctx context.Context) error {
 	_, err := n.telegramBot.SendMessage(ctx, &bot.SendMessageParams{
-		ChatID: n.chatID,
-		Text:   "Deployed!",
+		ChatID:              n.chatID,
+		Text:                "Deployed!",
+		DisableNotification: true,
 	})
 
 	if err != nil {
