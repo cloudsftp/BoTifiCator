@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"os"
+	"strings"
 
 	"github.com/cloudsftp/botificator/pkg/analyzer"
 	"github.com/go-telegram/bot"
@@ -12,7 +13,19 @@ import (
 
 type Notificator struct {
 	telegramBot *bot.Bot
-	chatID      string
+	chatIDs     []string
+}
+
+func filter[T any](list []T, pred func(T) bool) []T {
+	var result []T
+
+	for _, element := range list {
+		if pred(element) {
+			result = append(result, element)
+		}
+	}
+
+	return result
 }
 
 func New() (*Notificator, error) {
@@ -21,8 +34,11 @@ func New() (*Notificator, error) {
 		return nil, fmt.Errorf("no environment variable TELEGRAM_TOKEN")
 	}
 
-	chatID := os.Getenv("TELEGRAM_CHANNEL_ID")
-	if chatID == "" {
+	chatIDs := filter(
+		strings.Split(os.Getenv("TELEGRAM_CHANNEL_ID"), ";"),
+		func(id string) bool { return len(id) != 0 },
+	)
+	if len(chatIDs) == 0 {
 		return nil, fmt.Errorf("no environment variable TELEGRAM_CHANNEL_ID")
 	}
 
@@ -35,32 +51,36 @@ func New() (*Notificator, error) {
 		return nil, fmt.Errorf("could not connect to bot: %w", err)
 	}
 
-	return &Notificator{bot, chatID}, nil
+	return &Notificator{bot, chatIDs}, nil
 }
 
 func (n *Notificator) SendMessage(ctx context.Context, message string) error {
-	_, err := n.telegramBot.SendMessage(ctx, &bot.SendMessageParams{
-		ChatID:    n.chatID,
-		Text:      message,
-		ParseMode: models.ParseModeMarkdown,
-	})
+	for _, chatID := range n.chatIDs {
+		_, err := n.telegramBot.SendMessage(ctx, &bot.SendMessageParams{
+			ChatID:    chatID,
+			Text:      message,
+			ParseMode: models.ParseModeMarkdown,
+		})
 
-	if err != nil {
-		return fmt.Errorf("could not send message: %w", err)
+		if err != nil {
+			return fmt.Errorf("could not send message: %w", err)
+		}
 	}
 
 	return nil
 }
 
 func (n *Notificator) SendMessageDeployed(ctx context.Context) error {
-	_, err := n.telegramBot.SendMessage(ctx, &bot.SendMessageParams{
-		ChatID:              n.chatID,
-		Text:                "Deployed!",
-		DisableNotification: true,
-	})
+	for _, chatID := range n.chatIDs {
+		_, err := n.telegramBot.SendMessage(ctx, &bot.SendMessageParams{
+			ChatID:              chatID,
+			Text:                "Deployed!",
+			DisableNotification: true,
+		})
 
-	if err != nil {
-		return fmt.Errorf("could not send message: %w", err)
+		if err != nil {
+			return fmt.Errorf("could not send message: %w", err)
+		}
 	}
 
 	return nil
