@@ -3,6 +3,7 @@ package server
 import (
 	"context"
 	"fmt"
+	"sync"
 	"time"
 
 	"resty.dev/v3"
@@ -65,8 +66,9 @@ func (s *Server) Run(ctx context.Context) error {
 		return fmt.Errorf("could not send initial message: %w", err)
 	}
 
+	var done sync.WaitGroup
+	done.Add(1)
 	errors := make(chan error)
-	done := make(chan any)
 	go func() {
 	loop:
 		for {
@@ -78,6 +80,7 @@ func (s *Server) Run(ctx context.Context) error {
 				break loop
 			}
 		}
+		done.Done()
 	}()
 
 	err = s.UpdateDatabase(ctx)
@@ -114,7 +117,7 @@ func (s *Server) Run(ctx context.Context) error {
 		}
 	}()
 
-	<-done
+	done.Wait()
 	return nil
 }
 
