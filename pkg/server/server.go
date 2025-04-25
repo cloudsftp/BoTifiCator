@@ -22,7 +22,6 @@ type Server struct {
 	dataProvider *db.DataProvider
 	client       *resty.Client
 	scheduler    gocron.Scheduler
-	errors       chan error
 }
 
 func New(ctx context.Context) (*Server, error) {
@@ -48,28 +47,50 @@ func New(ctx context.Context) (*Server, error) {
 		return nil, fmt.Errorf("could not create scheduler: %w", err)
 	}
 
-	err = notificator.SendMessageDeployed(ctx)
-	if err != nil {
-		return nil, fmt.Errorf("could not send message: %w", err)
-	}
-
-	errors := make(chan error)
-
-	return &Server{notificator, dataProvider, client, scheduler, errors}, nil
+	return &Server{notificator, dataProvider, client, scheduler}, nil
 }
 
 func (s *Server) Close() {
 	err := s.client.Close()
 	if err != nil {
-		s.errors <- fmt.Errorf("could not close client: %w", err)
+		logrus.Errorf("could not close client: %s", err)
 	}
 
 	s.dataProvider.Close()
 }
 
 func (s *Server) Run(ctx context.Context) error {
-	s.UpdateDatabase(ctx)
-	_, err := s.scheduler.NewJob(
+	err := s.notificator.SendMessageDeployed(ctx)
+	if err != nil {
+		return fmt.Errorf("could not send initial message: %w", err)
+	}
+
+	errors := make(chan error)
+	done := make(chan any)
+	go func() {
+	loop:
+		for {
+			select {
+			case err := <-errors:
+				logrus.Errorf("runtime error: %s", err)
+			case <-ctx.Done(): // TODO: remove when other cases are added
+				logrus.Error("context done")
+				break loop
+			}
+		}
+	}()
+
+	err = s.UpdateDatabase(ctx)
+	if err != nil {
+		return fmt.Errorf("could not update database initially: %w", err)
+	}
+
+	err = s.SendUpdate(ctx)
+	if err != nil {
+		return fmt.Errorf("could not send initial update message: %w", err)
+	}
+
+	_, err = s.scheduler.NewJob(
 		gocron.DurationJob(15*time.Minute),
 		gocron.NewTask(s.UpdateDatabase, ctx),
 	)
@@ -93,39 +114,32 @@ func (s *Server) Run(ctx context.Context) error {
 		}
 	}()
 
-loop:
-	for {
-		select {
-		case err := <-s.errors:
-			logrus.Errorf("runtime error: %s", err)
-		case <-ctx.Done(): // TODO: remove when other cases are added
-			logrus.Error("context done")
-			break loop
-		}
-	}
-
+	<-done
 	return nil
 }
 
-func (s *Server) UpdateDatabase(ctx context.Context) {
+func (s *Server) UpdateDatabase(ctx context.Context) error {
 	err := load.LoadDataIntoDatabase(ctx, s.client, s.dataProvider)
 	if err != nil {
-		s.errors <- fmt.Errorf("could not load data into database: %s", err)
+		return fmt.Errorf("could not load data into database: %s", err)
 	}
 
 	logrus.Debug("Updated database")
+	return nil
 }
 
-func (s *Server) SendUpdate(ctx context.Context) {
+func (s *Server) SendUpdate(ctx context.Context) error {
 	reports, err := analyzer.Analyze(ctx, s.dataProvider)
 	if err != nil {
-		s.errors <- fmt.Errorf("could not generate daily reports: %s", err)
+		return fmt.Errorf("could not generate daily reports: %s", err)
 	}
 
 	logrus.Debug("generated reports successfully")
 
 	err = s.notificator.SendDailyReports(ctx, reports)
 	if err != nil {
-		s.errors <- fmt.Errorf("could not send daily reports: %s", err)
+		return fmt.Errorf("could not send daily reports: %s", err)
 	}
+
+	return nil
 }

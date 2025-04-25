@@ -49,7 +49,7 @@ func formatNumber(f float64, width int) string {
 	var result strings.Builder
 
 	numSpaces := max(0, width-(len(fString)+numCommas))
-	for i := 0; i < numSpaces; i++ {
+	for range numSpaces {
 		result.WriteRune(' ')
 	}
 
