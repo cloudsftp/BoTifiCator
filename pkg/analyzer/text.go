@@ -4,8 +4,14 @@ import (
 	"fmt"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/go-telegram/bot"
+)
+
+var (
+	day               = time.Hour * 24
+	mostRecentLowDate = time.Date(2022, time.November, 22, 0, 0, 0, 0, time.UTC)
 )
 
 func (d *DailyReport) Markdown(title string) string {
@@ -19,12 +25,15 @@ MA 111:    %s
 Gap:       %s (%s%%)
 
 Average:   %s
+
+%d days since last low
 `,
 		formatNumber(d.averages.MovingAverage350x2, numberWidth),
 		formatNumber(d.averages.MovingAverage111, numberWidth),
 		formatNumber(d.PiCycleTopDifference(), numberWidth),
 		formatNumber(d.PiCycleTopDifferencePercent(), 0),
 		formatNumber(d.averages.DailyAverage, numberWidth),
+		daysSince(d.averages.Day, mostRecentLowDate),
 	))
 
 	return fmt.Sprintf("*%s*\n\n```%s```", heading, content)
@@ -56,4 +65,9 @@ func formatNumber(f float64, width int) string {
 	result.WriteString(fString[j:])
 
 	return result.String()
+}
+
+func daysSince(now time.Time, prev time.Time) int {
+	duration := now.Truncate(day).Sub(prev.Truncate(day))
+	return int(duration.Hours() / 24)
 }
