@@ -38,11 +38,11 @@ func (d *DailyReport) Markdown(title string) string {
 Average:   %s
 200W MA:   %s
 `,
-		formatNumber(d.averages.DailyAverage, numberWidth),
-		formatNumber(d.averages.MovingAverage200W, numberWidth),
+		d.DaysUntilHalving(),
 		daysSince(d.averages.Day, mostRecentLowDate),
 		daysSince(d.averages.Day, mostRecentHighDate),
-		d.DaysUntilHalving(),
+		formatNumber(d.averages.DailyAverage, numberWidth),
+		formatNumber(d.averages.MovingAverage200W, numberWidth),
 	)
 
 	return fmt.Sprintf("*%s*\n\n```%s```", heading, bot.EscapeMarkdown(content))
