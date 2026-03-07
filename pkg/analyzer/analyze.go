@@ -16,12 +16,12 @@ type DailyReport struct {
 	averages *db.MovingAverages
 }
 
-func (d *DailyReport) DayString() string {
-	return d.averages.Day.Format("2006-01-02")
+func NewDailyReport(a *db.MovingAverages) DailyReport {
+	return DailyReport{averages: a}
 }
 
-func (d *DailyReport) DaysUntilHalving() int {
-	return daysUntil(nextHalvingDate, d.averages.Day)
+func (d *DailyReport) DayString() string {
+	return d.averages.Day.Format("2006-01-02")
 }
 
 func Analyze(ctx context.Context, dataProvider *db.DataProvider) ([]DailyReport, error) {
@@ -32,7 +32,7 @@ func Analyze(ctx context.Context, dataProvider *db.DataProvider) ([]DailyReport,
 
 	var reports []DailyReport
 	for _, averages := range movingAverages {
-		reports = append(reports, DailyReport{&averages})
+		reports = append(reports, NewDailyReport(&averages))
 	}
 
 	return reports, nil

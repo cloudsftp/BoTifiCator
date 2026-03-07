@@ -18,18 +18,19 @@ var (
 func (d *DailyReport) Markdown(title string) string {
 	heading := bot.EscapeMarkdown(fmt.Sprintf("%s (%s)", title, d.DayString()))
 
-	numberWidth := 12
+	daysUntilHalving := daysUntil(nextHalvingDate, d.averages.Day)
 
-	content := ""
+	halvingWarning := ""
+	if daysUntilHalving < 360 {
+		halvingWarning = fmt.Sprintf("\n*%s*\n", bot.EscapeMarkdown(
+			"!!! The Halving is Near !!!",
+		))
 
-	if d.DaysUntilHalving() < 360 {
-		content += fmt.Sprintf(`
-!!! The Halving is Near !!!
-`,
-		)
 	}
 
-	content += fmt.Sprintf(`
+	numberWidth := 12
+
+	content := bot.EscapeMarkdown(fmt.Sprintf(`
 %d days until next halving
 
 %d days since last low
@@ -38,14 +39,19 @@ func (d *DailyReport) Markdown(title string) string {
 Average:   %s
 200W MA:   %s
 `,
-		d.DaysUntilHalving(),
+		daysUntilHalving,
 		daysSince(d.averages.Day, mostRecentLowDate),
 		daysSince(d.averages.Day, mostRecentHighDate),
 		formatNumber(d.averages.DailyAverage, numberWidth),
 		formatNumber(d.averages.MovingAverage200W, numberWidth),
-	)
+	))
 
-	return fmt.Sprintf("*%s*\n\n```%s```", heading, bot.EscapeMarkdown(content))
+	return fmt.Sprintf(
+		"*%s*\n%s\n```%s```",
+		heading,
+		halvingWarning,
+		content,
+	)
 }
 
 func formatNumber(f float64, width int) string {
