@@ -3,8 +3,13 @@ package analyzer
 import (
 	"context"
 	"fmt"
+	"time"
 
 	"github.com/cloudsftp/botificator/pkg/db"
+)
+
+var (
+	nextHalvingDate = time.Date(2028, time.April, 1, 0, 0, 0, 0, time.UTC)
 )
 
 type DailyReport struct {
@@ -15,12 +20,8 @@ func (d *DailyReport) DayString() string {
 	return d.averages.Day.Format("2006-01-02")
 }
 
-func (d *DailyReport) PiCycleTopDifference() float64 {
-	return d.averages.MovingAverage350x2 - d.averages.MovingAverage111
-}
-
-func (d *DailyReport) PiCycleTopDifferencePercent() float64 {
-	return d.PiCycleTopDifference() / d.averages.MovingAverage111 * 100.
+func (d *DailyReport) DaysUntilHalving() int {
+	return daysUntil(nextHalvingDate, d.averages.Day)
 }
 
 func Analyze(ctx context.Context, dataProvider *db.DataProvider) ([]DailyReport, error) {
@@ -35,4 +36,9 @@ func Analyze(ctx context.Context, dataProvider *db.DataProvider) ([]DailyReport,
 	}
 
 	return reports, nil
+}
+
+func daysUntil(future time.Time, now time.Time) int {
+	duration := future.Truncate(day).Sub(now.Truncate(day))
+	return int(duration.Hours() / 24)
 }

@@ -21,11 +21,15 @@ func (d *DailyReport) Markdown(title string) string {
 
 	content := bot.EscapeMarkdown(fmt.Sprintf(`
 Average:   %s
+200W MA:   %s
 
 %d days since last low
+%d days until halving
 `,
 		formatNumber(d.averages.DailyAverage, numberWidth),
+		formatNumber(d.averages.MovingAverage200W, numberWidth),
 		daysSince(d.averages.Day, mostRecentLowDate),
+		d.DaysUntilHalving(),
 	))
 
 	return fmt.Sprintf("*%s*\n\n```%s```", heading, content)

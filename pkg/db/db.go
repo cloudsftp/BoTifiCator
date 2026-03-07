@@ -75,10 +75,9 @@ func (d *DataProvider) InsertDataPoints(ctx context.Context, elements []api.Hist
 }
 
 type MovingAverages struct {
-	Day                time.Time
-	DailyAverage       float64
-	MovingAverage111   float64
-	MovingAverage350x2 float64
+	Day               time.Time
+	DailyAverage      float64
+	MovingAverage200W float64
 }
 
 func movingAverageSqlRange(numRows uint64) string {
@@ -90,14 +89,12 @@ func (d *DataProvider) GetMovingAverages(ctx context.Context, limit uint) ([]Mov
 		SELECT
 			day,
 			average,
-			avg(average) over %s AS ma111,
-			2 * avg(average) over %s AS ma350x2
+			avg(average) over %s AS ma200w
 		FROM %s
 		ORDER BY day DESC
 		LIMIT %d;
     `,
-		movingAverageSqlRange(111),
-		movingAverageSqlRange(350),
+		movingAverageSqlRange(1400),
 		dailyAverageView,
 		limit,
 	)
@@ -114,8 +111,7 @@ func (d *DataProvider) GetMovingAverages(ctx context.Context, limit uint) ([]Mov
 		err = result.Scan(
 			&row.Day,
 			&row.DailyAverage,
-			&row.MovingAverage111,
-			&row.MovingAverage350x2,
+			&row.MovingAverage200W,
 		)
 		if err != nil {
 			return nil, fmt.Errorf("could not scan row: %w", err)
