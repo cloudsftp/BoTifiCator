@@ -31,17 +31,17 @@ func (d *DailyReport) Markdown(title string) string {
 	numberWidth := 12
 
 	content := bot.EscapeMarkdown(fmt.Sprintf(`
-%d days until next halving
+%s until next halving
 
-%d days since last low
-%d days since last high
+%s since last low
+%s since last high
 
 Average:   %s
 200W MA:   %s
 `,
-		daysUntilHalving,
-		daysSince(d.averages.Day, mostRecentLowDate),
-		daysSince(d.averages.Day, mostRecentHighDate),
+		formatDays(daysUntilHalving, 12),
+		formatDays(daysSince(d.averages.Day, mostRecentLowDate), 12),
+		formatDays(daysSince(d.averages.Day, mostRecentHighDate), 12),
 		formatNumber(d.averages.DailyAverage, numberWidth),
 		formatNumber(d.averages.MovingAverage200W, numberWidth),
 	))
@@ -80,6 +80,20 @@ func formatNumber(f float64, width int) string {
 	result.WriteString(fString[j:])
 
 	return result.String()
+}
+
+func formatDays(days int, width int) string {
+	years := days / 365
+	remainingDays := days % 365
+
+	var s string
+	if years > 0 {
+		s = fmt.Sprintf("%1d years and %3d days", years, remainingDays)
+	} else {
+		s = fmt.Sprintf("            %3d days", days)
+	}
+
+	return fmt.Sprintf("%*s", width, s)
 }
 
 func daysSince(now time.Time, prev time.Time) int {

@@ -21,6 +21,6 @@ func showMessage(date time.Time) {
 
 func main() {
 	showMessage(time.Date(2027, 3, 6, 0, 0, 0, 0, time.UTC))
-	fmt.Println("\n\n---\n")
+	fmt.Println("\n---")
 	showMessage(time.Date(2028, 3, 6, 0, 0, 0, 0, time.UTC))
 }
