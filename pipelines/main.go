@@ -9,13 +9,13 @@ import (
 type BoTifiCator struct{}
 
 const (
-	GoVersion     = "1.23"
-	AlpineVersion = "3.21"
+	GoVersion     = "1.25"
+	AlpineVersion = "3.23"
 
 	serviceName = "botificator-service"
 
-	golangciVersion = "v1.64"
-	golangciLintURL = "github.com/golangci/golangci-lint/cmd/golangci-lint@" + golangciVersion
+	golangciVersion = "v2.11.1"
+	golangciLintURL = "github.com/golangci/golangci-lint/v2/cmd/golangci-lint@" + golangciVersion
 )
 
 // Builds the service and runs all tests (none right now)
