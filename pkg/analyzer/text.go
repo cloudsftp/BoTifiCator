@@ -20,18 +20,10 @@ func (d *DailyReport) Markdown(title string) string {
 	numberWidth := 12
 
 	content := bot.EscapeMarkdown(fmt.Sprintf(`
-MA 350x2:  %s
-MA 111:    %s
-Gap:       %s (%s%%)
-
 Average:   %s
 
 %d days since last low
 `,
-		formatNumber(d.averages.MovingAverage350x2, numberWidth),
-		formatNumber(d.averages.MovingAverage111, numberWidth),
-		formatNumber(d.PiCycleTopDifference(), numberWidth),
-		formatNumber(d.PiCycleTopDifferencePercent(), 0),
 		formatNumber(d.averages.DailyAverage, numberWidth),
 		daysSince(d.averages.Day, mostRecentLowDate),
 	))
