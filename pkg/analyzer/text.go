@@ -10,8 +10,9 @@ import (
 )
 
 var (
-	day               = time.Hour * 24
-	mostRecentLowDate = time.Date(2022, time.November, 22, 0, 0, 0, 0, time.UTC)
+	day                = time.Hour * 24
+	mostRecentLowDate  = time.Date(2022, time.November, 22, 0, 0, 0, 0, time.UTC)
+	mostRecentHighDate = time.Date(2025, time.October, 6, 0, 0, 0, 0, time.UTC)
 )
 
 func (d *DailyReport) Markdown(title string) string {
@@ -24,10 +25,13 @@ Average:   %s
 200W MA:   %s
 
 %d days since last low
-%d days until halving
+%d days since last high
+
+%d days until next halving
 `,
 		formatNumber(d.averages.DailyAverage, numberWidth),
 		formatNumber(d.averages.MovingAverage200W, numberWidth),
+		daysSince(d.averages.Day, mostRecentHighDate),
 		daysSince(d.averages.Day, mostRecentLowDate),
 		d.DaysUntilHalving(),
 	))
