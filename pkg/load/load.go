@@ -24,10 +24,7 @@ var startTime = time.Date(2024, 6, 1, 0, 0, 0, 0, time.UTC)
 func LoadDataIntoDatabase(ctx context.Context, client *resty.Client, dataProvider *db.DataProvider) error {
 	logrus.Debug("Updating database...")
 
-	startTimestamp, ok, err := dataProvider.GetLatestTimestamp(ctx)
-	if err != nil {
-		return fmt.Errorf("failed to get the latest timestamp: %w", err)
-	}
+	startTimestamp, ok := dataProvider.GetLatestTimestamp(ctx)
 	startTimestamp += step
 	if !ok {
 		startTimestamp = startTime.Unix()

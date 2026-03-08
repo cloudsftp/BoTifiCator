@@ -24,7 +24,7 @@ type DataProvider struct {
 }
 
 // GetLatestTimestamp returns the timestamp of the latest row
-func (d *DataProvider) GetLatestTimestamp(ctx context.Context) (int64, bool, error) {
+func (d *DataProvider) GetLatestTimestamp(ctx context.Context) (int64, bool) {
 	query := fmt.Sprintf(`
 		SELECT EXTRACT(EPOCH FROM time) AS unix_seconds
 		FROM %s
@@ -37,10 +37,10 @@ func (d *DataProvider) GetLatestTimestamp(ctx context.Context) (int64, bool, err
 	var latestTimestamp int64
 	err := row.Scan(&latestTimestamp)
 	if err != nil {
-		return 0, false, fmt.Errorf("could not execute query to get values from result: %w", err)
+		return 0, false
 	}
 
-	return latestTimestamp, true, nil
+	return latestTimestamp, true
 }
 
 // InsertDataPoints efficiently inserts multiple data points using COPY.
@@ -96,7 +96,7 @@ func (d *DataProvider) GetMovingAverages(ctx context.Context, limit uint) ([]Mov
 		LIMIT %d;
     `,
 		movingAverageSqlRange(200),
-		weeklyAverageView,
+		dailyAverageView,
 		limit,
 	)
 
