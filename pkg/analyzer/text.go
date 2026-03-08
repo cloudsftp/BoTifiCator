@@ -38,17 +38,14 @@ func (d *DailyReport) Markdown(title string) string {
 
 	nextHalvingLine := ""
 	if nextHalvingOk {
-		nextHalvingLine = fmt.Sprintf(`
-%s until next halving (%s)
-`,
-			formatDays(daysUntilNextHalving, 12),
+		nextHalvingLine = fmt.Sprintf("%s until next halving (%s)\n",
+			formatDays(daysUntilNextHalving),
 			dateString(nextHalving),
 		)
 	}
 
 	content := bot.EscapeMarkdown(fmt.Sprintf(`
-%s
-%s since last halving (%s)
+%s%s since last halving (%s)
 
 %s since last low
 %s since last high
@@ -57,10 +54,10 @@ Average:   %s
 200W MA:   %s
 `,
 		nextHalvingLine,
-		formatDays(daysSinceLastHalving, 12),
+		formatDays(daysSinceLastHalving),
 		dateString(lastHalving),
-		formatDays(daysSince(day, mostRecentLowDate), 12),
-		formatDays(daysSince(day, mostRecentHighDate), 12),
+		formatDays(daysSince(day, mostRecentLowDate)),
+		formatDays(daysSince(day, mostRecentHighDate)),
 		formatNumber(d.averages.DailyAverage, numberWidth),
 		formatNumber(d.averages.MovingAverage200W, numberWidth),
 	))

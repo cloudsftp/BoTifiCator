@@ -32,17 +32,19 @@ func (d *DailyReport) DateString() string {
 	return dateString(d.averages.Day)
 }
 
-func formatDays(days int, width int) string {
+func formatDays(days int) string {
 	years := days / 365
 	remainingDays := days % 365
 
 	s := ""
 	if years > 0 {
-		s = fmt.Sprintf("%1d years ", years)
+		s += fmt.Sprintf("%1d y ", years)
+	} else {
+		s += "    "
 	}
-	s += fmt.Sprintf(" %3d days", remainingDays)
+	s += fmt.Sprintf(" %3d d", remainingDays)
 
-	return fmt.Sprintf("%*s", width, s)
+	return s
 }
 
 func daysSince(now time.Time, prev time.Time) int {
