@@ -14,9 +14,16 @@ import (
 )
 
 const (
-	ohclTable         = "btc_5min"
-	dailyAverageView  = "btc_daily_avg"
+	ohclTable = "btc_5min"
+
+	dailyAverageView = "btc_daily_avg"
+	dailyAverage     = "daily_avg"
+
 	weeklyAverageView = "btc_weekly_avg"
+	weeklyAverage     = "weekly_avg"
+
+	weeklyMovingAveragesView = "btc_weekly_moving_avg"
+	weeklyMovingAverage200   = "weekly_moving_avg_200"
 )
 
 type DataProvider struct {

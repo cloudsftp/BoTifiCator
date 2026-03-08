@@ -19,7 +19,7 @@ const (
 	step = 5 * 60
 )
 
-var startTime = time.Date(2024, time.January, 1, 0, 0, 0, 0, time.UTC)
+var startTime = time.Date(2020, time.January, 1, 0, 0, 0, 0, time.UTC)
 
 func LoadDataIntoDatabase(ctx context.Context, client *resty.Client, dataProvider *db.DataProvider) error {
 	logrus.Debug("Updating database...")

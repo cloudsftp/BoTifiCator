@@ -77,18 +77,19 @@ func createTables(ctx context.Context, pool *pgxpool.Pool) error {
 		return fmt.Errorf("could not create hypertable %s: %w", ohclTable, err)
 	}
 
+	// TDOD: make building these queries reusable
 	// Daily Average
 	_, err = pool.Exec(ctx, fmt.Sprintf(`
 		CREATE MATERIALIZED VIEW IF NOT EXISTS %s
 		WITH (timescaledb.continuous) AS
 		SELECT
 			time_bucket('1 day', time) AS day,
-			avg(open) as daily_average
+			avg(open) as %s
 		FROM
 			%s
 		GROUP BY
 			day
-    `, dailyAverageView, ohclTable))
+    `, dailyAverageView, dailyAverage, ohclTable))
 	if err != nil {
 		return fmt.Errorf("could not create view %s : %w", dailyAverageView, err)
 	}
@@ -99,14 +100,27 @@ func createTables(ctx context.Context, pool *pgxpool.Pool) error {
 		WITH (timescaledb.continuous) AS
 		SELECT
 			time_bucket('1 week', day) AS week,
-			avg(daily_average) as weekly_average
+			avg(%s) as %s
 		FROM
 			%s
 		GROUP BY
 			week
-	`, weeklyAverageView, dailyAverageView))
+	`, weeklyAverageView, dailyAverage, weeklyAverage, dailyAverageView))
 	if err != nil {
 		return fmt.Errorf("could not create view %s : %w", weeklyAverageView, err)
+	}
+
+	// Weekly Moving Averages
+	_, err = pool.Exec(ctx, fmt.Sprintf(`
+		CREATE MATERIALIZED VIEW IF NOT EXISTS %s AS
+        SELECT
+            week,
+            avg(%s) OVER(ORDER BY week ROWS BETWEEN 199 PRECEDING AND CURRENT ROW) as %s
+        FROM
+			%s;
+`, weeklyMovingAveragesView, weeklyAverage, weeklyMovingAverage200, weeklyAverageView))
+	if err != nil {
+		return fmt.Errorf("could not create view %s : %w", weeklyMovingAveragesView, err)
 	}
 
 	return nil

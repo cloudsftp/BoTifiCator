@@ -11,7 +11,8 @@ docker run --rm --name timescaledb-container \
   -e POSTGRES_PASSWORD=postgres \
   -v timescaledb_data:/var/lib/postgresql/data \
   -p 5432:5432 \
-  -d timescale/timescaledb:latest-pg17
+  -d timescale/timescaledb:latest-pg17 \
+  -c timescaledb.enable_cagg_window_functions=on
 #+end_src
 
 Enable window function support
@@ -28,24 +29,13 @@ SHOW timescaledb.enable_cagg_window_functions;
 |------------------------------------------|
 | on                                       |
 
-#+headers: :engine postgresql :cmdline "postgres://postgres:postgres@localhost:5432/postgres"
-#+begin_src sql
-SHOW config_file;
-#+end_src
-
-#+RESULTS:
-| config_file                              |
-|------------------------------------------|
-| /var/lib/postgresql/data/postgresql.conf |
-
-*** Moving Averages
+*** Tables
 
 **** Test Data
 
 #+headers: :engine postgresql :cmdline "postgres://postgres:postgres@localhost:5432/postgres"
 #+begin_src sql
-SELECT
-        *
+SELECT *
 FROM btc_5min
 ORDER BY time DESC
 LIMIT 3;
@@ -54,9 +44,9 @@ LIMIT 3;
 #+RESULTS:
 | time                   |        open |        high |         low |       close |                  volume |
 |------------------------+-------------+-------------+-------------+-------------+-------------------------|
-| 2026-03-08 14:00:00+00 | 67236.00000 | 67305.00000 | 67195.00000 | 67290.00000 |  9.28308044000000000000 |
-| 2026-03-08 13:55:00+00 | 67159.00000 | 67281.00000 | 67159.00000 | 67245.00000 | 13.35057499000000000000 |
-| 2026-03-08 13:50:00+00 | 67165.00000 | 67207.00000 | 67121.00000 | 67159.00000 |  7.54015080000000000000 |
+| 2026-03-08 19:15:00+00 | 67016.00000 | 67209.00000 | 67002.00000 | 67153.00000 | 17.28236004000000000000 |
+| 2026-03-08 19:10:00+00 | 66945.00000 | 67067.00000 | 66938.00000 | 67017.00000 |  9.57677282000000000000 |
+| 2026-03-08 19:05:00+00 | 66861.00000 | 66957.00000 | 66850.00000 | 66945.00000 |  6.76013800000000000000 |
 
 **** Daily
 #+headers: :engine postgresql :cmdline "postgres://postgres:postgres@localhost:5432/postgres"
@@ -74,7 +64,7 @@ CREATE MATERIALIZED VIEW IF NOT EXISTS btc_daily_avg
 WITH (timescaledb.continuous) AS
 SELECT
         time_bucket('1 day', time) AS day,
-        avg(open) as daily_average
+        avg(open) as daily_avg
 FROM
         btc_5min
 GROUP BY
@@ -95,9 +85,9 @@ LIMIT 3;
 #+end_src
 
 #+RESULTS:
-| day                    |      daily_average |
+| day                    |          daily_avg |
 |------------------------+--------------------|
-| 2026-03-08 00:00:00+00 | 67306.434065934066 |
+| 2026-03-08 00:00:00+00 | 67250.583673469388 |
 | 2026-03-07 00:00:00+00 | 67846.906250000000 |
 | 2026-03-06 00:00:00+00 | 69709.791666666667 |
 
@@ -109,8 +99,7 @@ DROP MATERIALIZED VIEW btc_weekly_avg;
 #+end_src
 
 #+RESULTS:
-| DROP MATERIALIZED VIEW |
-|------------------------|
+|---|
 
 #+headers: :engine postgresql :cmdline "postgres://postgres:postgres@localhost:5432/postgres"
 #+begin_src sql
@@ -118,7 +107,7 @@ CREATE MATERIALIZED VIEW IF NOT EXISTS btc_weekly_avg
 WITH (timescaledb.continuous) AS
 SELECT
         time_bucket('1 week', day) AS week,
-        avg(daily_average) as weekly_average
+        avg(daily_avg) as weekly_avg
 FROM
         btc_daily_avg
 GROUP BY
@@ -139,9 +128,9 @@ LIMIT 10;
 #+end_src
 
 #+RESULTS:
-| week                   |     weekly_average |
+| week                   |         weekly_avg |
 |------------------------+--------------------|
-| 2026-03-02 00:00:00+00 | 69021.355660212803 |
+| 2026-03-02 00:00:00+00 | 69013.377032717849 |
 | 2026-02-23 00:00:00+00 | 66003.213789682540 |
 | 2026-02-16 00:00:00+00 | 67700.428571428571 |
 | 2026-02-09 00:00:00+00 | 68567.811507936508 |
@@ -154,11 +143,11 @@ LIMIT 10;
 
 ***** Moving Averages
 
-TODO
+200-week moving average using window functions on weekly aggregates:
 
 #+headers: :engine postgresql :cmdline "postgres://postgres:postgres@localhost:5432/postgres"
 #+begin_src sql
-DROP MATERIALIZED VIEW btc_weekly_moving_avg;
+DROP VIEW btc_weekly_moving_avg;
 #+end_src
 
 #+RESULTS:
@@ -167,19 +156,40 @@ DROP MATERIALIZED VIEW btc_weekly_moving_avg;
 
 #+headers: :engine postgresql :cmdline "postgres://postgres:postgres@localhost:5432/postgres"
 #+begin_src sql
-CREATE MATERIALIZED VIEW IF NOT EXISTS btc_weekly_moving_avg
-WITH (timescaledb.continuous) AS
+CREATE VIEW IF NOT EXISTS btc_weekly_moving_avg AS
 SELECT
         week,
-        avg(weekly_average) OVER(ORDER BY week ROWS BETWEEN 100 PRECEDING AND CURRENT ROW) as wma200
+        avg(weekly_avg) OVER(ORDER BY week ROWS BETWEEN 199 PRECEDING AND CURRENT ROW) as weekly_moving_avg_200
 FROM
-        btc_weekly_avg
-GROUP BY
-        week;
+        btc_weekly_avg;
 #+end_src
 
 #+RESULTS:
-|---|
+| SELECT 323 |
+|------------|
+
+#+headers: :engine postgresql :cmdline "postgres://postgres:postgres@localhost:5432/postgres"
+#+begin_src sql
+SELECT *
+FROM btc_weekly_moving_avg
+ORDER BY week DESC
+LIMIT 3;
+#+end_src
+
+#+RESULTS:
+| week | weekly_moving_avg_200 |
+|------+-----------------------|
+
+#+headers: :engine postgresql :cmdline "postgres://postgres:postgres@localhost:5432/postgres"
+#+begin_src sql
+SELECT COUNT(week)
+FROM btc_weekly_avg;
+#+end_src
+
+#+RESULTS:
+| count |
+|-------|
+|     0 |
 
 **** Combined
 
