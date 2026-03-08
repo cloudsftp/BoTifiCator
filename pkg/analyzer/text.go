@@ -8,19 +8,23 @@ import (
 	"github.com/go-telegram/bot"
 )
 
+const (
+	oneAndAHalfYears = 360 + 180
+)
+
 func (d *DailyReport) Markdown(title string) string {
 	day := d.averages.Day
 
 	heading := bot.EscapeMarkdown(fmt.Sprintf("%s (%s)", title, d.DateString()))
 
-	daysUntilNextHalving, nextHalving, ok := daysUntilNextHalving(day)
+	daysUntilNextHalving, nextHalving, nextHalvingOk := daysUntilNextHalving(day)
 	daysSinceLastHalving, lastHalving := daysSinceLastHalving(day)
 
 	halvingWarning := ""
 	switch {
-	case !ok:
+	case !nextHalvingOk:
 		halvingWarning = "Next halving is in the past. Please update the halving dates"
-	case daysUntilNextHalving < 360+180:
+	case daysUntilNextHalving < oneAndAHalfYears:
 		halvingWarning = "!!! The Halving is Near !!!"
 	}
 	if halvingWarning != "" {
@@ -32,8 +36,18 @@ func (d *DailyReport) Markdown(title string) string {
 
 	numberWidth := 12
 
-	content := bot.EscapeMarkdown(fmt.Sprintf(`
+	nextHalvingLine := ""
+	if nextHalvingOk {
+		nextHalvingLine = fmt.Sprintf(`
 %s until next halving (%s)
+`,
+			formatDays(daysUntilNextHalving, 12),
+			dateString(nextHalving),
+		)
+	}
+
+	content := bot.EscapeMarkdown(fmt.Sprintf(`
+%s
 %s since last halving (%s)
 
 %s since last low
@@ -42,8 +56,7 @@ func (d *DailyReport) Markdown(title string) string {
 Average:   %s
 200W MA:   %s
 `,
-		formatDays(daysUntilNextHalving, 12),
-		dateString(nextHalving),
+		nextHalvingLine,
 		formatDays(daysSinceLastHalving, 12),
 		dateString(lastHalving),
 		formatDays(daysSince(day, mostRecentLowDate), 12),
