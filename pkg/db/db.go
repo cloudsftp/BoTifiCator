@@ -14,8 +14,9 @@ import (
 )
 
 const (
-	ohclTable        = "btc_5min"
-	dailyAverageView = "btc_daily_avg"
+	ohclTable         = "btc_5min"
+	dailyAverageView  = "btc_daily_avg"
+	weeklyAverageView = "btc_weekly_avg"
 )
 
 type DataProvider struct {
@@ -94,8 +95,8 @@ func (d *DataProvider) GetMovingAverages(ctx context.Context, limit uint) ([]Mov
 		ORDER BY day DESC
 		LIMIT %d;
     `,
-		movingAverageSqlRange(1400),
-		dailyAverageView,
+		movingAverageSqlRange(200),
+		weeklyAverageView,
 		limit,
 	)
 

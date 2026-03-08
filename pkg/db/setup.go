@@ -77,6 +77,7 @@ func createTables(ctx context.Context, pool *pgxpool.Pool) error {
 		return fmt.Errorf("could not create hypertable %s: %w", ohclTable, err)
 	}
 
+	// Daily Average
 	_, err = pool.Exec(ctx, fmt.Sprintf(`
 		CREATE MATERIALIZED VIEW IF NOT EXISTS %s
 		WITH (timescaledb.continuous) AS
@@ -97,6 +98,29 @@ func createTables(ctx context.Context, pool *pgxpool.Pool) error {
     `, dailyAverageView))
 	if err != nil {
 		return fmt.Errorf("could not set %s to real time: %w", dailyAverageView, err)
+	}
+
+	// Weekly Average
+	_, err = pool.Exec(ctx, fmt.Sprintf(`
+		CREATE MATERIALIZED VIEW IF NOT EXISTS %s
+		WITH (timescaledb.continuous) AS
+		SELECT
+			time_bucket('1 week', time) AS day,
+			AVG(low) as average
+		FROM
+			%s
+		GROUP BY
+			day
+    `, weeklyAverageView, ohclTable))
+	if err != nil {
+		return fmt.Errorf("could not create view %s : %w", weeklyAverageView, err)
+	}
+
+	_, err = pool.Exec(ctx, fmt.Sprintf(`
+		ALTER MATERIALIZED VIEW %s set (timescaledb.materialized_only = false);
+    `, weeklyAverageView))
+	if err != nil {
+		return fmt.Errorf("could not set %s to real time: %w", weeklyAverageView, err)
 	}
 
 	return nil
