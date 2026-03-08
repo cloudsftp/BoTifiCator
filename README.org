@@ -8,51 +8,174 @@ Up
 
 #+begin_src bash
 docker run --rm --name timescaledb-container \
-  -e POSTGRES_PASSWORD=mysecretpassword \
+  -e POSTGRES_PASSWORD=postgres \
   -v timescaledb_data:/var/lib/postgresql/data \
   -p 5432:5432 \
   -d timescale/timescaledb:latest-pg17
 #+end_src
 
-Interact
+Enable window function support
 
-#+begin_src bash
-psql -U postgres -p 5432 -h localhost
+TODO: configure it automatically, right now manually writing it into container config
+
+#+headers: :engine postgresql :cmdline "postgres://postgres:postgres@localhost:5432/postgres"
+#+begin_src sql
+SHOW timescaledb.enable_cagg_window_functions;
 #+end_src
+
+#+RESULTS:
+| timescaledb.enable_cagg_window_functions |
+|------------------------------------------|
+| on                                       |
+
+#+headers: :engine postgresql :cmdline "postgres://postgres:postgres@localhost:5432/postgres"
+#+begin_src sql
+SHOW config_file;
+#+end_src
+
+#+RESULTS:
+| config_file                              |
+|------------------------------------------|
+| /var/lib/postgresql/data/postgresql.conf |
 
 *** Moving Averages
 
-**** Daily
+**** Test Data
 
-#+headers: :engine postgresql :cmdline "postgres://postgres:mysecretpassword@localhost:5432/postgres"
+#+headers: :engine postgresql :cmdline "postgres://postgres:postgres@localhost:5432/postgres"
 #+begin_src sql
 SELECT
-        day,
-        average,
-        avg(average) over (ORDER BY day DESC ROWS BETWEEN CURRENT ROW AND 110 FOLLOWING) AS ma111,
-        2 * avg(average) over (ORDER BY day DESC ROWS BETWEEN CURRENT ROW AND 349 FOLLOWING) AS ma350x2
-FROM btc_daily_avg
-ORDER BY day
+        *
+FROM btc_5min
+ORDER BY time DESC
 LIMIT 3;
 #+end_src
 
 #+RESULTS:
-| day                    |            average |              ma111 |             ma350x2 |
-|------------------------+--------------------+--------------------+---------------------|
-| 2026-03-08 00:00:00+00 | 67121.693069306931 | 82853.620357981744 | 197924.497690554770 |
-| 2026-03-07 00:00:00+00 | 67809.795138888889 | 83096.297203453453 | 198024.594384920634 |
-| 2026-03-06 00:00:00+00 | 69630.413194444444 | 83341.857482482482 | 198117.995376984126 |
+| time                   |        open |        high |         low |       close |                  volume |
+|------------------------+-------------+-------------+-------------+-------------+-------------------------|
+| 2026-03-08 14:00:00+00 | 67236.00000 | 67305.00000 | 67195.00000 | 67290.00000 |  9.28308044000000000000 |
+| 2026-03-08 13:55:00+00 | 67159.00000 | 67281.00000 | 67159.00000 | 67245.00000 | 13.35057499000000000000 |
+| 2026-03-08 13:50:00+00 | 67165.00000 | 67207.00000 | 67121.00000 | 67159.00000 |  7.54015080000000000000 |
+
+**** Daily
+#+headers: :engine postgresql :cmdline "postgres://postgres:postgres@localhost:5432/postgres"
+#+begin_src sql
+DROP MATERIALIZED VIEW btc_daily_avg;
+#+end_src
+
+#+RESULTS:
+| DROP MATERIALIZED VIEW |
+|------------------------|
+
+#+headers: :engine postgresql :cmdline "postgres://postgres:postgres@localhost:5432/postgres"
+#+begin_src sql
+CREATE MATERIALIZED VIEW IF NOT EXISTS btc_daily_avg
+WITH (timescaledb.continuous) AS
+SELECT
+        time_bucket('1 day', time) AS day,
+        avg(open) as daily_average
+FROM
+        btc_5min
+GROUP BY
+        day;
+#+end_src
+
+#+RESULTS:
+| CREATE MATERIALIZED VIEW |
+|--------------------------|
+
+
+#+headers: :engine postgresql :cmdline "postgres://postgres:postgres@localhost:5432/postgres"
+#+begin_src sql
+SELECT *
+FROM btc_daily_avg
+ORDER BY day DESC
+LIMIT 3;
+#+end_src
+
+#+RESULTS:
+| day                    |      daily_average |
+|------------------------+--------------------|
+| 2026-03-08 00:00:00+00 | 67306.434065934066 |
+| 2026-03-07 00:00:00+00 | 67846.906250000000 |
+| 2026-03-06 00:00:00+00 | 69709.791666666667 |
 
 **** Weekly
 
-#+headers: :engine postgresql :cmdline "postgres://postgres:mysecretpassword@localhost:5432/postgres"
+#+headers: :engine postgresql :cmdline "postgres://postgres:postgres@localhost:5432/postgres"
 #+begin_src sql
+DROP MATERIALIZED VIEW btc_weekly_avg;
+#+end_src
+
+#+RESULTS:
+| DROP MATERIALIZED VIEW |
+|------------------------|
+
+#+headers: :engine postgresql :cmdline "postgres://postgres:postgres@localhost:5432/postgres"
+#+begin_src sql
+CREATE MATERIALIZED VIEW IF NOT EXISTS btc_weekly_avg
+WITH (timescaledb.continuous) AS
 SELECT
-        day,
-        average
+        time_bucket('1 week', day) AS week,
+        avg(daily_average) as weekly_average
+FROM
+        btc_daily_avg
+GROUP BY
+        week;
+#+end_src
+
+#+RESULTS:
+| CREATE MATERIALIZED VIEW |
+|--------------------------|
+
+
+#+headers: :engine postgresql :cmdline "postgres://postgres:postgres@localhost:5432/postgres"
+#+begin_src sql
+SELECT *
 FROM btc_weekly_avg
-ORDER BY day DESC
-LIMIT 3;
+ORDER BY week DESC
+LIMIT 10;
+#+end_src
+
+#+RESULTS:
+| week                   |     weekly_average |
+|------------------------+--------------------|
+| 2026-03-02 00:00:00+00 | 69021.355660212803 |
+| 2026-02-23 00:00:00+00 | 66003.213789682540 |
+| 2026-02-16 00:00:00+00 | 67700.428571428571 |
+| 2026-02-09 00:00:00+00 | 68567.811507936508 |
+| 2026-02-02 00:00:00+00 | 72232.343253968254 |
+| 2026-01-26 00:00:00+00 | 84957.312003968254 |
+| 2026-01-19 00:00:00+00 | 89931.327876984127 |
+| 2026-01-12 00:00:00+00 | 94548.788194444444 |
+| 2026-01-05 00:00:00+00 | 91559.424603174603 |
+| 2025-12-29 00:00:00+00 | 88945.833333333333 |
+
+***** Moving Averages
+
+TODO
+
+#+headers: :engine postgresql :cmdline "postgres://postgres:postgres@localhost:5432/postgres"
+#+begin_src sql
+DROP MATERIALIZED VIEW btc_weekly_moving_avg;
+#+end_src
+
+#+RESULTS:
+| DROP MATERIALIZED VIEW |
+|------------------------|
+
+#+headers: :engine postgresql :cmdline "postgres://postgres:postgres@localhost:5432/postgres"
+#+begin_src sql
+CREATE MATERIALIZED VIEW IF NOT EXISTS btc_weekly_moving_avg
+WITH (timescaledb.continuous) AS
+SELECT
+        week,
+        avg(weekly_average) OVER(ORDER BY week ROWS BETWEEN 100 PRECEDING AND CURRENT ROW) as wma200
+FROM
+        btc_weekly_avg
+GROUP BY
+        week;
 #+end_src
 
 #+RESULTS:
@@ -60,19 +183,10 @@ LIMIT 3;
 
 **** Combined
 
-#+headers: :engine postgresql :cmdline "postgres://postgres:mysecretpassword@localhost:5432/postgres"
-#+begin_src sql
-SELECT
-        day,
-        average
-FROM btc_daily_avg btc_weekly_avg,
-ORDER BY day DESC
-LIMIT 3;
-#+end_src
 
 ** Data
 
-bitstamp.com http api
+bitstamp.com HTTP API
 
 *** Rate Limits
 

@@ -9,7 +9,7 @@ import (
 type BoTifiCator struct{}
 
 const (
-	GoVersion     = "1.25"
+	GoVersion     = "1.26"
 	AlpineVersion = "3.23"
 
 	serviceName = "botificator-service"

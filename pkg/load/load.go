@@ -19,7 +19,7 @@ const (
 	step = 5 * 60
 )
 
-var startTime = time.Date(2024, 6, 1, 0, 0, 0, 0, time.UTC)
+var startTime = time.Date(2024, time.January, 1, 0, 0, 0, 0, time.UTC)
 
 func LoadDataIntoDatabase(ctx context.Context, client *resty.Client, dataProvider *db.DataProvider) error {
 	logrus.Debug("Updating database...")
@@ -51,7 +51,12 @@ func LoadDataIntoDatabase(ctx context.Context, client *resty.Client, dataProvide
 	}
 }
 
-func downloadData(ctx context.Context, client *resty.Client, dataProvider *db.DataProvider, currentTimestamp int64) (int64, bool, error) {
+func downloadData(
+	ctx context.Context,
+	client *resty.Client,
+	dataProvider *db.DataProvider,
+	currentTimestamp int64,
+) (int64, bool, error) {
 	result, err := client.R().WithContext(ctx).SetQueryParams(map[string]string{
 		"step":                   fmt.Sprint(step),
 		"limit":                  "1000",

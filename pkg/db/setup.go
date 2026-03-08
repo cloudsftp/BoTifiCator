@@ -93,13 +93,6 @@ func createTables(ctx context.Context, pool *pgxpool.Pool) error {
 		return fmt.Errorf("could not create view %s : %w", dailyAverageView, err)
 	}
 
-	_, err = pool.Exec(ctx, fmt.Sprintf(`
-		ALTER MATERIALIZED VIEW %s set (timescaledb.materialized_only = false);
-    `, dailyAverageView))
-	if err != nil {
-		return fmt.Errorf("could not set %s to real time: %w", dailyAverageView, err)
-	}
-
 	// Weekly Average
 	_, err = pool.Exec(ctx, fmt.Sprintf(`
 		CREATE MATERIALIZED VIEW IF NOT EXISTS %s
@@ -110,17 +103,10 @@ func createTables(ctx context.Context, pool *pgxpool.Pool) error {
 		FROM
 			%s
 		GROUP BY
-			day
-    `, weeklyAverageView, dailyAverageView))
+			week
+	`, weeklyAverageView, dailyAverageView))
 	if err != nil {
 		return fmt.Errorf("could not create view %s : %w", weeklyAverageView, err)
-	}
-
-	_, err = pool.Exec(ctx, fmt.Sprintf(`
-		ALTER MATERIALIZED VIEW %s set (timescaledb.materialized_only = false);
-    `, weeklyAverageView))
-	if err != nil {
-		return fmt.Errorf("could not set %s to real time: %w", weeklyAverageView, err)
 	}
 
 	return nil
