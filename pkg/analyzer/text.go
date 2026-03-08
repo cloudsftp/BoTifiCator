@@ -4,34 +4,37 @@ import (
 	"fmt"
 	"strconv"
 	"strings"
-	"time"
 
 	"github.com/go-telegram/bot"
 )
 
-var (
-	day                = time.Hour * 24
-	mostRecentLowDate  = time.Date(2022, time.November, 22, 0, 0, 0, 0, time.UTC)
-	mostRecentHighDate = time.Date(2025, time.October, 6, 0, 0, 0, 0, time.UTC)
-)
-
 func (d *DailyReport) Markdown(title string) string {
-	heading := bot.EscapeMarkdown(fmt.Sprintf("%s (%s)", title, d.DayString()))
+	day := d.averages.Day
 
-	daysUntilHalving := daysUntil(nextHalvingDate, d.averages.Day)
+	heading := bot.EscapeMarkdown(fmt.Sprintf("%s (%s)", title, d.DateString()))
+
+	daysUntilNextHalving, nextHalving, ok := daysUntilNextHalving(day)
+	daysSinceLastHalving, lastHalving := daysSinceLastHalving(day)
 
 	halvingWarning := ""
-	if daysUntilHalving < 360 {
-		halvingWarning = fmt.Sprintf("\n*%s*\n", bot.EscapeMarkdown(
-			"!!! The Halving is Near !!!",
-		))
-
+	switch {
+	case !ok:
+		halvingWarning = "Next halving is in the past. Please update the halving dates"
+	case daysUntilNextHalving < 360+180:
+		halvingWarning = "!!! The Halving is Near !!!"
+	}
+	if halvingWarning != "" {
+		halvingWarning = fmt.Sprintf(
+			"\n*%s*\n",
+			bot.EscapeMarkdown(halvingWarning),
+		)
 	}
 
 	numberWidth := 12
 
 	content := bot.EscapeMarkdown(fmt.Sprintf(`
-%s until next halving
+%s until next halving (%s)
+%s since last halving (%s)
 
 %s since last low
 %s since last high
@@ -39,9 +42,12 @@ func (d *DailyReport) Markdown(title string) string {
 Average:   %s
 200W MA:   %s
 `,
-		formatDays(daysUntilHalving, 12),
-		formatDays(daysSince(d.averages.Day, mostRecentLowDate), 12),
-		formatDays(daysSince(d.averages.Day, mostRecentHighDate), 12),
+		formatDays(daysUntilNextHalving, 12),
+		dateString(nextHalving),
+		formatDays(daysSinceLastHalving, 12),
+		dateString(lastHalving),
+		formatDays(daysSince(day, mostRecentLowDate), 12),
+		formatDays(daysSince(day, mostRecentHighDate), 12),
 		formatNumber(d.averages.DailyAverage, numberWidth),
 		formatNumber(d.averages.MovingAverage200W, numberWidth),
 	))
@@ -80,23 +86,4 @@ func formatNumber(f float64, width int) string {
 	result.WriteString(fString[j:])
 
 	return result.String()
-}
-
-func formatDays(days int, width int) string {
-	years := days / 365
-	remainingDays := days % 365
-
-	var s string
-	if years > 0 {
-		s = fmt.Sprintf("%1d years and %3d days", years, remainingDays)
-	} else {
-		s = fmt.Sprintf("            %3d days", days)
-	}
-
-	return fmt.Sprintf("%*s", width, s)
-}
-
-func daysSince(now time.Time, prev time.Time) int {
-	duration := now.Truncate(day).Sub(prev.Truncate(day))
-	return int(duration.Hours() / 24)
 }
