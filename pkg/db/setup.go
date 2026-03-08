@@ -83,7 +83,7 @@ func createTables(ctx context.Context, pool *pgxpool.Pool) error {
 		WITH (timescaledb.continuous) AS
 		SELECT
 			time_bucket('1 day', time) AS day,
-			AVG(low) as average
+			avg(open) as daily_average
 		FROM
 			%s
 		GROUP BY
@@ -105,13 +105,13 @@ func createTables(ctx context.Context, pool *pgxpool.Pool) error {
 		CREATE MATERIALIZED VIEW IF NOT EXISTS %s
 		WITH (timescaledb.continuous) AS
 		SELECT
-			time_bucket('1 week', time) AS day,
-			AVG(low) as average
+			time_bucket('1 week', day) AS week,
+			avg(daily_average) as weekly_average
 		FROM
 			%s
 		GROUP BY
 			day
-    `, weeklyAverageView, ohclTable))
+    `, weeklyAverageView, dailyAverageView))
 	if err != nil {
 		return fmt.Errorf("could not create view %s : %w", weeklyAverageView, err)
 	}
