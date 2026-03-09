@@ -4,20 +4,33 @@ Project for monitoring some selected bitcoin indicators
 
 ** Database
 
-Up
+#+begin_src bash
+docker kill timescaledb-container
+#+end_src
+
+#+RESULTS:
+: timescaledb-container
+
+#+begin_src bash
+docker volume rm timescaledb_data
+#+end_src
+
+#+RESULTS:
+: timescaledb_data
 
 #+begin_src bash
 docker run --rm --name timescaledb-container \
   -e POSTGRES_PASSWORD=postgres \
   -v timescaledb_data:/var/lib/postgresql/data \
+  -v ./sql:/docker-entrypoint-initdb.d \
   -p 5432:5432 \
-  -d timescale/timescaledb:latest-pg17 \
-  -c timescaledb.enable_cagg_window_functions=on
+  -d timescale/timescaledb:latest-pg17
+
+  #-c timescaledb.enable_cagg_window_functions=on
 #+end_src
 
-Enable window function support
-
-TODO: configure it automatically, right now manually writing it into container config
+#+RESULTS:
+: 1e5d4e0b16ae7a17f0426c33e1bbbb1e80b9b176528f027456683a599428605c
 
 #+headers: :engine postgresql :cmdline "postgres://postgres:postgres@localhost:5432/postgres"
 #+begin_src sql
@@ -36,7 +49,7 @@ SHOW timescaledb.enable_cagg_window_functions;
 #+headers: :engine postgresql :cmdline "postgres://postgres:postgres@localhost:5432/postgres"
 #+begin_src sql
 SELECT *
-FROM btc_5min
+FROM btc_ohlc_5min
 ORDER BY time DESC
 LIMIT 3;
 #+end_src
@@ -51,7 +64,7 @@ LIMIT 3;
 **** Daily
 #+headers: :engine postgresql :cmdline "postgres://postgres:postgres@localhost:5432/postgres"
 #+begin_src sql
-DROP MATERIALIZED VIEW btc_daily_avg;
+DROP MATERIALIZED VIEW btc_avg_1day;
 #+end_src
 
 #+RESULTS:
@@ -60,15 +73,15 @@ DROP MATERIALIZED VIEW btc_daily_avg;
 
 #+headers: :engine postgresql :cmdline "postgres://postgres:postgres@localhost:5432/postgres"
 #+begin_src sql
-CREATE MATERIALIZED VIEW IF NOT EXISTS btc_daily_avg
+CREATE MATERIALIZED VIEW IF NOT EXISTS btc_avg_1day
 WITH (timescaledb.continuous) AS
 SELECT
-        time_bucket('1 day', time) AS day,
-        avg(open) as daily_avg
+    time_bucket('1 day', time) AS day,
+    avg(open) as average
 FROM
-        btc_5min
+    btc_ohlc_5min
 GROUP BY
-        day;
+    day
 #+end_src
 
 #+RESULTS:
@@ -79,7 +92,7 @@ GROUP BY
 #+headers: :engine postgresql :cmdline "postgres://postgres:postgres@localhost:5432/postgres"
 #+begin_src sql
 SELECT *
-FROM btc_daily_avg
+FROM btc_avg_1day
 ORDER BY day DESC
 LIMIT 3;
 #+end_src
@@ -95,34 +108,17 @@ LIMIT 3;
 
 #+headers: :engine postgresql :cmdline "postgres://postgres:postgres@localhost:5432/postgres"
 #+begin_src sql
-DROP MATERIALIZED VIEW btc_weekly_avg;
+DROP MATERIALIZED VIEW btc_avg_1week;
 #+end_src
 
 #+RESULTS:
 |---|
 
-#+headers: :engine postgresql :cmdline "postgres://postgres:postgres@localhost:5432/postgres"
-#+begin_src sql
-CREATE MATERIALIZED VIEW IF NOT EXISTS btc_weekly_avg
-WITH (timescaledb.continuous) AS
-SELECT
-        time_bucket('1 week', day) AS week,
-        avg(daily_avg) as weekly_avg
-FROM
-        btc_daily_avg
-GROUP BY
-        week;
-#+end_src
-
-#+RESULTS:
-| CREATE MATERIALIZED VIEW |
-|--------------------------|
-
 
 #+headers: :engine postgresql :cmdline "postgres://postgres:postgres@localhost:5432/postgres"
 #+begin_src sql
 SELECT *
-FROM btc_weekly_avg
+FROM btc_avg_1week
 ORDER BY week DESC
 LIMIT 10;
 #+end_src

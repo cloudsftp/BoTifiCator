@@ -14,16 +14,10 @@ import (
 )
 
 const (
-	ohclTable = "btc_5min"
+	ohlcTable = "btc_ohlc_5min"
 
-	dailyAverageView = "btc_daily_avg"
-	dailyAverage     = "daily_avg"
-
-	weeklyAverageView = "btc_weekly_avg"
-	weeklyAverage     = "weekly_avg"
-
-	weeklyMovingAveragesView = "btc_weekly_moving_avg"
-	weeklyMovingAverage200   = "weekly_moving_avg_200"
+	dailyAverageView  = "btc_avg_1day"
+	weeklyAverageView = "btc_avg_1week"
 )
 
 type DataProvider struct {
@@ -37,7 +31,7 @@ func (d *DataProvider) GetLatestTimestamp(ctx context.Context) (int64, bool) {
 		FROM %s
 		ORDER BY time DESC
 		LIMIT 1
-	`, ohclTable)
+	`, ohlcTable)
 
 	row := d.pool.QueryRow(ctx, query)
 
@@ -55,7 +49,7 @@ func (d *DataProvider) GetLatestTimestamp(ctx context.Context) (int64, bool) {
 func (d *DataProvider) InsertDataPoints(ctx context.Context, elements []api.HistoricalDataPoint) (bool, error) {
 	copyCount, err := d.pool.CopyFrom(
 		ctx,
-		pgx.Identifier{ohclTable},
+		pgx.Identifier{ohlcTable},
 		[]string{"time", "open", "high", "low", "close", "volume"},
 		pgx.CopyFromSlice(len(elements), func(i int) ([]any, error) {
 			element := elements[i]
@@ -66,7 +60,14 @@ func (d *DataProvider) InsertDataPoints(ctx context.Context, elements []api.Hist
 			}
 			timeDate := time.Unix(unixSeconds, 0)
 
-			return []any{timeDate, element.Open, element.High, element.Low, element.Close, element.Volume}, nil
+			return []any{
+				timeDate,
+				element.Open,
+				element.High,
+				element.Low,
+				element.Close,
+				element.Volume,
+			}, nil
 		}),
 	)
 
