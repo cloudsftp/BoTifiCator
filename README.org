@@ -135,8 +135,7 @@ GROUP BY
 #+end_src
 
 #+RESULTS:
-| CREATE MATERIALIZED VIEW |
-|--------------------------|
+|---|
 
 #+headers: :engine postgresql :cmdline "postgres://postgres:postgres@localhost:5432/postgres"
 #+begin_src sql
@@ -155,25 +154,19 @@ LIMIT 3;
 
 ***** Moving Averages
 
-200-week moving average using window functions on weekly aggregates:
-
 #+headers: :engine postgresql :cmdline "postgres://postgres:postgres@localhost:5432/postgres"
 #+begin_src sql
-DROP VIEW btc_weekly_moving_avg;
-#+end_src
-
-#+RESULTS:
-| DROP MATERIALIZED VIEW |
-|------------------------|
-
-#+headers: :engine postgresql :cmdline "postgres://postgres:postgres@localhost:5432/postgres"
-#+begin_src sql
-CREATE VIEW btc_moving_avg_1week AS
-SELECT
-        week,
-        avg(average) OVER(ORDER BY week ROWS BETWEEN 199 PRECEDING AND CURRENT ROW) as weekly_moving_avg_200
+CREATE OR REPLACE VIEW
+    btc_moving_avg_1week
+AS SELECT
+    time_bucket('1 week', week) as week,
+    avg(average) OVER(ORDER BY week ROWS BETWEEN 199 PRECEDING AND CURRENT ROW) as moving_average_200,
+    avg(average) OVER(ORDER BY week ROWS BETWEEN  99 PRECEDING AND CURRENT ROW) as moving_average_100
 FROM
-        btc_avg_1week
+    btc_avg_1week
+ORDER BY
+    week
+DESC
 ;
 #+end_src
 
@@ -190,11 +183,11 @@ LIMIT 3;
 #+end_src
 
 #+RESULTS:
-| week                   | weekly_moving_avg_200 |
-|------------------------+-----------------------|
-| 2026-03-09 00:00:00+00 |    58811.677952473073 |
-| 2026-03-02 00:00:00+00 |    58617.661428893849 |
-| 2026-02-23 00:00:00+00 |    58458.889425793651 |
+| week                   | moving_average_200 | moving_average_100 |
+|------------------------+--------------------+--------------------|
+| 2026-03-09 00:00:00+00 | 58811.676947513320 | 87392.999695721084 |
+| 2026-03-02 00:00:00+00 | 58617.661428893849 | 87388.832981150794 |
+| 2026-02-23 00:00:00+00 | 58458.889425793651 | 87376.076245039683 |
 
 #+headers: :engine postgresql :cmdline "postgres://postgres:postgres@localhost:5432/postgres"
 #+begin_src sql
