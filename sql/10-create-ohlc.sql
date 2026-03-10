@@ -1,6 +1,8 @@
 CREATE EXTENSION IF NOT EXISTS timescaledb;
 
-CREATE TABLE IF NOT EXISTS btc_ohlc_5min (
+CREATE TABLE IF NOT EXISTS
+    btc_ohlc_5min
+(
     time   TIMESTAMPTZ    NOT NULL UNIQUE,
     open   DECIMAL(30,5)  NOT NULL,
     high   DECIMAL(30,5)  NOT NULL,
