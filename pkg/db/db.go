@@ -86,6 +86,7 @@ func (d *DataProvider) InsertDataPoints(ctx context.Context, elements []api.Hist
 type MovingAverages struct {
 	Day               time.Time
 	DailyAverage      float64
+	WeeklyAverage     float64
 	MovingAverage200W float64
 }
 

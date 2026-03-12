@@ -55,27 +55,29 @@ LIMIT 3;
 #+end_src
 
 #+RESULTS:
-| time                   |        open |        high |         low |       close |                   volume |
-|------------------------+-------------+-------------+-------------+-------------+--------------------------|
-| 2026-03-10 20:20:00+00 | 70131.00000 | 70261.00000 | 70131.00000 | 70243.00000 | 145.33641485000000000000 |
-| 2026-03-10 20:15:00+00 | 70121.00000 | 70135.00000 | 70018.00000 | 70135.00000 |  18.99166744000000000000 |
-| 2026-03-10 20:10:00+00 | 70104.00000 | 70131.00000 | 70047.00000 | 70116.00000 |  16.68393975000000000000 |
+| time                   |        open |        high |         low |       close |                  volume |
+|------------------------+-------------+-------------+-------------+-------------+-------------------------|
+| 2026-03-10 20:50:00+00 | 70328.00000 | 70338.00000 | 70256.00000 | 70260.00000 | 11.30105345000000000000 |
+| 2026-03-10 20:45:00+00 | 70311.00000 | 70312.00000 | 70248.00000 | 70306.00000 | 14.75440043000000000000 |
+| 2026-03-10 20:40:00+00 | 70301.00000 | 70355.00000 | 70234.00000 | 70306.00000 | 43.46711841000000000000 |
 
 **** Daily
 
 
 #+headers: :engine postgresql :cmdline "postgres://postgres:postgres@localhost:5432/postgres"
 #+begin_src sql
-DROP MATERIALIZED VIEW btc_avg_1day;
+DROP MATERIALIZED VIEW btc_avg_1day CASCADE;
 #+end_src
 
 #+RESULTS:
-|---|
+| DROP MATERIALIZED VIEW |
+|------------------------|
 
 
 #+headers: :engine postgresql :cmdline "postgres://postgres:postgres@localhost:5432/postgres"
 #+begin_src sql
-CREATE MATERIALIZED VIEW IF NOT EXISTS btc_avg_1day
+CREATE MATERIALIZED VIEW IF NOT EXISTS
+    btc_avg_1day
 WITH (timescaledb.continuous) AS
 SELECT
     time_bucket('1 day', time) AS day,
@@ -85,11 +87,17 @@ FROM
 GROUP BY
     day
 ;
+ALTER MATERIALIZED VIEW
+    btc_avg_1day
+SET
+    (timescaledb.materialized_only = false)
+;
 #+end_src
 
 #+RESULTS:
 | CREATE MATERIALIZED VIEW |
 |--------------------------|
+| ALTER MATERIALIZED VIEW  |
 
 
 #+headers: :engine postgresql :cmdline "postgres://postgres:postgres@localhost:5432/postgres"
@@ -101,11 +109,11 @@ LIMIT 3;
 #+end_src
 
 #+RESULTS:
-| day                    |            average |
+| day                    |       average_1day |
 |------------------------+--------------------|
-| 2026-03-10 00:00:00+00 | 70300.816326530612 |
+| 2026-03-11 00:00:00+00 | 70000.443983402490 |
+| 2026-03-10 00:00:00+00 | 70241.645833333333 |
 | 2026-03-09 00:00:00+00 | 68002.708333333333 |
-| 2026-03-08 00:00:00+00 | 67149.607638888889 |
 
 
 
@@ -113,29 +121,40 @@ LIMIT 3;
 
 #+headers: :engine postgresql :cmdline "postgres://postgres:postgres@localhost:5432/postgres"
 #+begin_src sql
-DROP MATERIALIZED VIEW btc_avg_1week;
+DROP MATERIALIZED VIEW btc_avg_1week CASCADE;
 #+end_src
 
 #+RESULTS:
-|---|
+| DROP MATERIALIZED VIEW |
+|------------------------|
 
 
 #+headers: :engine postgresql :cmdline "postgres://postgres:postgres@localhost:5432/postgres"
 #+begin_src sql
-CREATE MATERIALIZED VIEW IF NOT EXISTS btc_avg_1week
+CREATE MATERIALIZED VIEW IF NOT EXISTS
+    btc_avg_1week
 WITH (timescaledb.continuous) AS
 SELECT
+    day,
     time_bucket('1 week', day) AS week,
     avg(average) as average
 FROM
     btc_avg_1day
 GROUP BY
+    day,
     week
+;
+ALTER MATERIALIZED VIEW
+    btc_avg_1week
+SET
+    (timescaledb.materialized_only = false)
 ;
 #+end_src
 
 #+RESULTS:
-|---|
+| CREATE MATERIALIZED VIEW |
+|--------------------------|
+| ALTER MATERIALIZED VIEW  |
 
 #+headers: :engine postgresql :cmdline "postgres://postgres:postgres@localhost:5432/postgres"
 #+begin_src sql
@@ -146,25 +165,36 @@ LIMIT 3;
 #+end_src
 
 #+RESULTS:
-| week                   |            average |
-|------------------------+--------------------|
-| 2026-03-09 00:00:00+00 | 69151.762329931973 |
-| 2026-03-02 00:00:00+00 | 68998.951884920635 |
-| 2026-02-23 00:00:00+00 | 66003.213789682540 |
+| day                    | week                   |      average_1week |
+|------------------------+------------------------+--------------------|
+| 2026-03-09 00:00:00+00 | 2026-03-09 00:00:00+00 | 68002.708333333333 |
+| 2026-03-10 00:00:00+00 | 2026-03-09 00:00:00+00 | 70241.645833333333 |
+| 2026-03-11 00:00:00+00 | 2026-03-09 00:00:00+00 | 70000.443983402490 |
 
 ***** Moving Averages
+
+#+headers: :engine postgresql :cmdline "postgres://postgres:postgres@localhost:5432/postgres"
+#+begin_src sql
+DROP VIEW btc_moving_avg_1week CASCADE;
+#+end_src
+
+#+RESULTS:
+| DROP VIEW |
+|-----------|
 
 #+headers: :engine postgresql :cmdline "postgres://postgres:postgres@localhost:5432/postgres"
 #+begin_src sql
 CREATE OR REPLACE VIEW
     btc_moving_avg_1week
 AS SELECT
+    day,
     time_bucket('1 week', week) as week,
     avg(average) OVER(ORDER BY week ROWS BETWEEN 199 PRECEDING AND CURRENT ROW) as moving_average_200,
     avg(average) OVER(ORDER BY week ROWS BETWEEN  99 PRECEDING AND CURRENT ROW) as moving_average_100
 FROM
     btc_avg_1week
 ORDER BY
+    day,
     week
 DESC
 ;
@@ -183,25 +213,58 @@ LIMIT 3;
 #+end_src
 
 #+RESULTS:
-| week                   | moving_average_200 | moving_average_100 |
-|------------------------+--------------------+--------------------|
-| 2026-03-09 00:00:00+00 | 58811.676947513320 | 87392.999695721084 |
-| 2026-03-02 00:00:00+00 | 58617.661428893849 | 87388.832981150794 |
-| 2026-02-23 00:00:00+00 | 58458.889425793651 | 87376.076245039683 |
+| day                    | week                   | moving_average_1week_200 | moving_average_1week_100 |
+|------------------------+------------------------+--------------------------+--------------------------|
+| 2026-03-09 00:00:00+00 | 2026-03-09 00:00:00+00 |       95321.460000000000 |       82084.514513888889 |
+| 2026-03-10 00:00:00+00 | 2026-03-09 00:00:00+00 |       95100.765607638889 |       81875.047048611111 |
+| 2026-03-11 00:00:00+00 | 2026-03-09 00:00:00+00 |       94873.429615750346 |       81713.814162056247 |
 
 #+headers: :engine postgresql :cmdline "postgres://postgres:postgres@localhost:5432/postgres"
 #+begin_src sql
 SELECT COUNT(week)
-FROM btc_weekly_avg;
+FROM btc_avg_1week;
 #+end_src
 
 #+RESULTS:
 | count |
 |-------|
-|     0 |
+|   324 |
 
-**** Combined
+**** Read
 
+#+headers: :engine postgresql :cmdline "postgres://postgres:postgres@localhost:5432/postgres"
+#+begin_src sql
+SELECT
+    btc_avg_1day.day,
+    btc_avg_1week.week,
+    btc_avg_1day.daily_average,
+    btc_avg_1week.weekly_average
+    --btc_moving_avg_1week.moving_average_200,
+    --btc_moving_avg_1week.moving_average_100
+FROM
+    btc_avg_1day
+JOIN
+    btc_avg_1week
+ON
+    btc_avg_1day.day = btc_avg_1week.day
+--JOIN
+--    btc_moving_avg_1week
+--ON
+--    btc_avg_1day.day = btc_moving_avg_1week.day
+ORDER BY
+    btc_avg_1day.day
+DESC
+LIMIT
+    3
+;
+#+end_src
+
+#+RESULTS:
+| day                    | week                   |         daily_average |        weekly_average |
+|------------------------+------------------------+-----------------------+-----------------------|
+| 2020-03-03 00:00:00+00 | 2020-03-02 00:00:00+00 | 8833.4497222222222222 | 8833.4497222222222222 |
+| 2020-03-02 00:00:00+00 | 2020-03-02 00:00:00+00 | 8746.5821527777777778 | 8746.5821527777777778 |
+| 2020-03-01 00:00:00+00 | 2020-02-24 00:00:00+00 | 8556.9421180555555556 | 8556.9421180555555556 |
 
 ** Data
 
