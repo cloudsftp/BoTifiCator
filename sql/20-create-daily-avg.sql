@@ -3,7 +3,7 @@ CREATE MATERIALIZED VIEW IF NOT EXISTS
 WITH (timescaledb.continuous) AS
 SELECT
     time_bucket('1 day', time) AS day,
-    avg(open) as daily_average
+    avg(open) as average
 FROM
     btc_ohlc_5min
 GROUP BY
