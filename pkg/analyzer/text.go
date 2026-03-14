@@ -4,39 +4,76 @@ import (
 	"fmt"
 	"strconv"
 	"strings"
-	"time"
 
 	"github.com/go-telegram/bot"
 )
 
-var (
-	day               = time.Hour * 24
-	mostRecentLowDate = time.Date(2022, time.November, 22, 0, 0, 0, 0, time.UTC)
+const (
+	oneAndAHalfYears = 360 + 180
 )
 
 func (d *DailyReport) Markdown(title string) string {
-	heading := bot.EscapeMarkdown(fmt.Sprintf("%s (%s)", title, d.DayString()))
+	day := d.data.Day
+
+	heading := bot.EscapeMarkdown(fmt.Sprintf("%s (%s)", title, d.DateString()))
+
+	daysUntilNextHalving, nextHalving, nextHalvingOk := daysUntilNextHalving(day)
+	daysSinceLastHalving, lastHalving := daysSinceLastHalving(day)
+
+	halvingWarning := ""
+	switch {
+	case !nextHalvingOk:
+		halvingWarning = "Next halving is in the past. Please update the halving dates"
+	case daysUntilNextHalving < oneAndAHalfYears:
+		halvingWarning = "!!! The Halving is Near !!!"
+	}
+	if halvingWarning != "" {
+		halvingWarning = fmt.Sprintf(
+			"\n*%s*\n",
+			bot.EscapeMarkdown(halvingWarning),
+		)
+	}
 
 	numberWidth := 12
 
+	nextHalvingLine := ""
+	if nextHalvingOk {
+		nextHalvingLine = fmt.Sprintf("%s until next halving (%s)\n",
+			formatDays(daysUntilNextHalving),
+			dateString(nextHalving),
+		)
+	}
+
 	content := bot.EscapeMarkdown(fmt.Sprintf(`
-MA 350x2:  %s
-MA 111:    %s
-Gap:       %s (%s%%)
+%s%s since last halving (%s)
 
-Average:   %s
+%s since last low
+%s since last high
 
-%d days since last low
+Daily Avg:    %s (%s)
+Weekly Avg:   %s (%s)
+200W MA:      %s
+100W MA:      %s
 `,
-		formatNumber(d.averages.MovingAverage350x2, numberWidth),
-		formatNumber(d.averages.MovingAverage111, numberWidth),
-		formatNumber(d.PiCycleTopDifference(), numberWidth),
-		formatNumber(d.PiCycleTopDifferencePercent(), 0),
-		formatNumber(d.averages.DailyAverage, numberWidth),
-		daysSince(d.averages.Day, mostRecentLowDate),
+		nextHalvingLine,
+		formatDays(daysSinceLastHalving),
+		dateString(lastHalving),
+		formatDays(daysSince(day, mostRecentLowDate)),
+		formatDays(daysSince(day, mostRecentHighDate)),
+		formatNumber(d.data.Daily[0].Average, numberWidth),
+		formatNumber(d.data.Daily[1].Average, numberWidth),
+		formatNumber(d.data.Weekly[0].Average, numberWidth),
+		formatNumber(d.data.Weekly[1].Average, numberWidth),
+		formatNumber(d.data.Weekly[0].MovingAverage200, numberWidth),
+		formatNumber(d.data.Weekly[0].MovingAverage100, numberWidth),
 	))
 
-	return fmt.Sprintf("*%s*\n\n```%s```", heading, content)
+	return fmt.Sprintf(
+		"*%s*\n%s\n```%s```",
+		heading,
+		halvingWarning,
+		content,
+	)
 }
 
 func formatNumber(f float64, width int) string {
@@ -65,9 +102,4 @@ func formatNumber(f float64, width int) string {
 	result.WriteString(fString[j:])
 
 	return result.String()
-}
-
-func daysSince(now time.Time, prev time.Time) int {
-	duration := now.Truncate(day).Sub(prev.Truncate(day))
-	return int(duration.Hours() / 24)
 }

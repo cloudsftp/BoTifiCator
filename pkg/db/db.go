@@ -14,8 +14,11 @@ import (
 )
 
 const (
-	ohclTable        = "btc_5min"
-	dailyAverageView = "btc_daily_avg"
+	ohlcTable = "btc_ohlc_5min"
+
+	dailyAverageView    = "btc_avg_1day"
+	weeklyAverageView   = "btc_avg_1week"
+	movingWeeklyAvgView = "btc_moving_avg_1week"
 )
 
 type DataProvider struct {
@@ -23,23 +26,24 @@ type DataProvider struct {
 }
 
 // GetLatestTimestamp returns the timestamp of the latest row
-func (d *DataProvider) GetLatestTimestamp(ctx context.Context) (int64, bool, error) {
+func (d *DataProvider) GetLatestTimestamp(ctx context.Context) (int64, bool) {
 	query := fmt.Sprintf(`
-		SELECT EXTRACT(EPOCH FROM time) AS unix_seconds
+		SELECT
+            EXTRACT(EPOCH FROM time) AS unix_seconds
 		FROM %s
 		ORDER BY time DESC
 		LIMIT 1
-	`, ohclTable)
+	`, ohlcTable)
 
 	row := d.pool.QueryRow(ctx, query)
 
 	var latestTimestamp int64
 	err := row.Scan(&latestTimestamp)
 	if err != nil {
-		return 0, false, fmt.Errorf("could not execute query to get values from result: %w", err)
+		return 0, false
 	}
 
-	return latestTimestamp, true, nil
+	return latestTimestamp, true
 }
 
 // InsertDataPoints efficiently inserts multiple data points using COPY.
@@ -47,18 +51,25 @@ func (d *DataProvider) GetLatestTimestamp(ctx context.Context) (int64, bool, err
 func (d *DataProvider) InsertDataPoints(ctx context.Context, elements []api.HistoricalDataPoint) (bool, error) {
 	copyCount, err := d.pool.CopyFrom(
 		ctx,
-		pgx.Identifier{ohclTable},
+		pgx.Identifier{ohlcTable},
 		[]string{"time", "open", "high", "low", "close", "volume"},
 		pgx.CopyFromSlice(len(elements), func(i int) ([]any, error) {
 			element := elements[i]
 
 			unixSeconds, err := strconv.ParseInt(element.Timestamp, 10, 64)
 			if err != nil {
-				return nil, err
+				return nil, fmt.Errorf("could not parse timestamp %q: %w", element.Timestamp, err)
 			}
 			timeDate := time.Unix(unixSeconds, 0)
 
-			return []any{timeDate, element.Open, element.High, element.Low, element.Close, element.Volume}, nil
+			return []any{
+				timeDate,
+				element.Open,
+				element.High,
+				element.Low,
+				element.Close,
+				element.Volume,
+			}, nil
 		}),
 	)
 
@@ -74,55 +85,88 @@ func (d *DataProvider) InsertDataPoints(ctx context.Context, elements []api.Hist
 	return true, nil
 }
 
-type MovingAverages struct {
-	Day                time.Time
-	DailyAverage       float64
-	MovingAverage111   float64
-	MovingAverage350x2 float64
+type ReportDataDaily struct {
+	Day     time.Time `db:"day"`
+	Average float64   `db:"average"`
 }
 
-func movingAverageSqlRange(numRows uint64) string {
-	return fmt.Sprintf("(ORDER BY day DESC ROWS BETWEEN CURRENT ROW AND %d FOLLOWING)", numRows-1)
-}
-
-func (d *DataProvider) GetMovingAverages(ctx context.Context, limit uint) ([]MovingAverages, error) {
+func (d *DataProvider) getReportDataDaily(ctx context.Context) ([]ReportDataDaily, error) {
 	query := fmt.Sprintf(`
 		SELECT
 			day,
-			average,
-			avg(average) over %s AS ma111,
-			2 * avg(average) over %s AS ma350x2
+			average
 		FROM %s
 		ORDER BY day DESC
-		LIMIT %d;
-    `,
-		movingAverageSqlRange(111),
-		movingAverageSqlRange(350),
-		dailyAverageView,
-		limit,
-	)
+		OFFSET 1
+		LIMIT 2
+	`, dailyAverageView)
 
-	result, err := d.pool.Query(ctx, query)
+	rows, err := d.pool.Query(ctx, query)
 	if err != nil {
-		return nil, fmt.Errorf("could not get moving averages: %w", err)
-	}
-	defer result.Close()
-
-	var averages []MovingAverages
-	for result.Next() {
-		var row MovingAverages
-		err = result.Scan(
-			&row.Day,
-			&row.DailyAverage,
-			&row.MovingAverage111,
-			&row.MovingAverage350x2,
-		)
-		if err != nil {
-			return nil, fmt.Errorf("could not scan row: %w", err)
-		}
-
-		averages = append(averages, row)
+		return nil, fmt.Errorf("could not get daily report data: %w", err)
 	}
 
-	return averages, nil
+	values, err := pgx.CollectRows(rows, pgx.RowToStructByName[ReportDataDaily])
+	if err != nil {
+		return nil, fmt.Errorf("could not deserialize daily report data: %w", err)
+	}
+
+	return values, nil
+}
+
+type ReportDataWeekly struct {
+	Week             time.Time `db:"week"`
+	Average          float64   `db:"average"`
+	MovingAverage200 float64   `db:"moving_average_200"`
+	MovingAverage100 float64   `db:"moving_average_100"`
+}
+
+func (d *DataProvider) getReportDataWeekly(ctx context.Context) ([]ReportDataWeekly, error) {
+	query := fmt.Sprintf(`
+		SELECT
+			w.week,
+			w.average,
+			m.moving_average_200,
+			m.moving_average_100
+		FROM %s w
+		JOIN %s m
+		ON
+            w.week = m.week
+		ORDER BY w.week DESC
+		OFFSET 1
+		LIMIT 2
+	`, weeklyAverageView, movingWeeklyAvgView)
+
+	rows, err := d.pool.Query(ctx, query)
+	if err != nil {
+		return nil, fmt.Errorf("could not get weekly report data: %w", err)
+	}
+
+	values, err := pgx.CollectRows(rows, pgx.RowToStructByName[ReportDataWeekly])
+	if err != nil {
+		return nil, fmt.Errorf("could not deserialize weekly report data: %w", err)
+	}
+
+	return values, nil
+}
+
+type ReportData struct {
+	Day    time.Time
+	Daily  []ReportDataDaily
+	Weekly []ReportDataWeekly
+}
+
+func (d *DataProvider) GetReportData(ctx context.Context) (*ReportData, error) {
+	daily, err := d.getReportDataDaily(ctx)
+	if err != nil {
+		return nil, err
+	}
+	day := daily[0].Day
+
+	weekly, err := d.getReportDataWeekly(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	return &ReportData{day, daily, weekly}, nil
 }

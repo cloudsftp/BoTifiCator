@@ -88,14 +88,9 @@ func (n *Notificator) SendMessageDeployed(ctx context.Context) error {
 
 func (n *Notificator) SendDailyReports(
 	ctx context.Context,
-	reports []analyzer.DailyReport,
+	report *analyzer.DailyReport,
 ) error {
-	if len(reports) == 0 {
-		return fmt.Errorf("no reports to send")
-	}
-
-	yesterday := reports[0]
-	message := yesterday.Markdown("Yesterday")
+	message := report.Markdown("Yesterday")
 
 	err := n.SendMessage(ctx, message)
 	if err != nil {

@@ -18,11 +18,6 @@ func New(ctx context.Context) (*DataProvider, error) {
 		return nil, fmt.Errorf("could not create a connection pool: %w", err)
 	}
 
-	err = createTables(ctx, pool)
-	if err != nil {
-		return nil, fmt.Errorf("could not create tables: %w", err)
-	}
-
 	return &DataProvider{pool}, nil
 }
 
@@ -53,51 +48,4 @@ func createConnectionPool(ctx context.Context) (*pgxpool.Pool, error) {
 	config.MinConns = 2
 
 	return pgxpool.NewWithConfig(ctx, config)
-}
-
-func createTables(ctx context.Context, pool *pgxpool.Pool) error {
-	_, err := pool.Exec(ctx, fmt.Sprintf(`
-		CREATE TABLE IF NOT EXISTS %s (
-			time   TIMESTAMPTZ    NOT NULL UNIQUE,
-			open   DECIMAL(30,5)  NOT NULL,
-			high   DECIMAL(30,5)  NOT NULL,
-			low    DECIMAL(30,5)  NOT NULL,
-			close  DECIMAL(30,5)  NOT NULL,
-			volume DECIMAL(40,20) NOT NULL
-		)
-	`, ohclTable))
-	if err != nil {
-		return fmt.Errorf("could not create table %s: %w", ohclTable, err)
-	}
-
-	_, err = pool.Exec(ctx, fmt.Sprintf(`
-		SELECT create_hypertable('%s', 'time', if_not_exists => true)
-	`, ohclTable))
-	if err != nil {
-		return fmt.Errorf("could not create hypertable %s: %w", ohclTable, err)
-	}
-
-	_, err = pool.Exec(ctx, fmt.Sprintf(`
-		CREATE MATERIALIZED VIEW IF NOT EXISTS %s
-		WITH (timescaledb.continuous) AS
-		SELECT
-			time_bucket('1 day', time) AS day,
-			AVG(low) as average
-		FROM
-			%s
-		GROUP BY
-			day
-    `, dailyAverageView, ohclTable))
-	if err != nil {
-		return fmt.Errorf("could not create view %s : %w", dailyAverageView, err)
-	}
-
-	_, err = pool.Exec(ctx, fmt.Sprintf(`
-		ALTER MATERIALIZED VIEW %s set (timescaledb.materialized_only = false);
-    `, dailyAverageView))
-	if err != nil {
-		return fmt.Errorf("could not set %s to real time: %w", dailyAverageView, err)
-	}
-
-	return nil
 }

@@ -4,46 +4,47 @@ Project for monitoring some selected bitcoin indicators
 
 ** Database
 
-Up
-
 #+begin_src bash
-docker run --name timescaledb-container \
-  -e POSTGRES_PASSWORD=mysecretpassword \
-  -v timescaledb_data:/var/lib/postgresql/data \
-  -p 5432:5432 \
-  -d timescale/timescaledb:latest-pg16
-#+end_src
-
-Interact
-
-#+begin_src bash
-psql -U postgres -p 5432 -h localhost
-#+end_src
-
-*** Moving Averages
-
-#+headers: :engine postgresql :cmdline "postgres://postgres:mysecretpassword@localhost:5432/postgres"
-#+begin_src sql
-SELECT
-        day,
-        average,
-        avg(average) over (ORDER BY day DESC ROWS BETWEEN CURRENT ROW AND 110 FOLLOWING) AS ma111,
-        2 * avg(average) over (ORDER BY day DESC ROWS BETWEEN CURRENT ROW AND 349 FOLLOWING) AS ma350x2
-FROM btc_daily_avg
-ORDER BY day
-LIMIT 3;
+docker kill timescaledb-container
 #+end_src
 
 #+RESULTS:
-| day                    |            average |              ma111 |             ma350x2 |
-|------------------------+--------------------+--------------------+---------------------|
-| 2025-03-02 00:00:00+00 | 85898.992424242424 | 96957.555737555738 | 154092.712924701562 |
-| 2025-03-01 00:00:00+00 | 85017.611111111111 | 96932.276526526527 | 154028.095143957826 |
-| 2025-02-28 00:00:00+00 | 81787.968750000000 | 96878.814439439439 | 153969.460978835978 |
+: timescaledb-container
+
+#+begin_src bash
+docker volume rm timescaledb_data
+#+end_src
+
+#+RESULTS:
+: timescaledb_data
+
+#+begin_src bash
+docker run --rm --name timescaledb-container \
+  -e POSTGRES_PASSWORD=postgres \
+  -v timescaledb_data:/var/lib/postgresql/data \
+  -v ./sql:/docker-entrypoint-initdb.d \
+  -p 5432:5432 \
+  -d timescale/timescaledb:latest-pg17
+
+  #-c timescaledb.enable_cagg_window_functions=on # TODO: explore this feature
+#+end_src
+
+#+RESULTS:
+: acd3258d3f7b1be1ba2e9e928f7c406743fb339dfd43eaf27da360f8bf6c4b86
+
+#+headers: :engine postgresql :cmdline "postgres://postgres:postgres@localhost:5432/postgres"
+#+begin_src sql
+SHOW timescaledb.enable_cagg_window_functions;
+#+end_src
+
+#+RESULTS:
+| timescaledb.enable_cagg_window_functions |
+|------------------------------------------|
+| off                                      |
 
 ** Data
 
-bitstamp.com http api
+bitstamp.com HTTP API
 
 *** Rate Limits
 

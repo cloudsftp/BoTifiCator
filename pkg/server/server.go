@@ -132,14 +132,14 @@ func (s *Server) UpdateDatabase(ctx context.Context) error {
 }
 
 func (s *Server) SendUpdate(ctx context.Context) error {
-	reports, err := analyzer.Analyze(ctx, s.dataProvider)
+	report, err := analyzer.Analyze(ctx, s.dataProvider)
 	if err != nil {
 		return fmt.Errorf("could not generate daily reports: %s", err)
 	}
 
 	logrus.Debug("generated reports successfully")
 
-	err = s.notificator.SendDailyReports(ctx, reports)
+	err = s.notificator.SendDailyReports(ctx, report)
 	if err != nil {
 		return fmt.Errorf("could not send daily reports: %s", err)
 	}
