@@ -58,7 +58,7 @@ func (d *DataProvider) InsertDataPoints(ctx context.Context, elements []api.Hist
 
 			unixSeconds, err := strconv.ParseInt(element.Timestamp, 10, 64)
 			if err != nil {
-				return nil, err
+				return nil, fmt.Errorf("could not parse timestamp %q: %w", element.Timestamp, err)
 			}
 			timeDate := time.Unix(unixSeconds, 0)
 
