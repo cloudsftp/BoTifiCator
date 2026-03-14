@@ -8,23 +8,21 @@ import (
 )
 
 type DailyReport struct {
-	averages *db.MovingAverages
+	data *db.ReportData
 }
 
-func NewDailyReport(a *db.MovingAverages) DailyReport {
-	return DailyReport{averages: a}
+func NewDailyReport(d *db.ReportData) DailyReport {
+	return DailyReport{data: d}
 }
 
-func Analyze(ctx context.Context, dataProvider *db.DataProvider) ([]DailyReport, error) {
-	movingAverages, err := dataProvider.GetMovingAverages(ctx, 3)
+func Analyze(
+	ctx context.Context,
+	dataProvider *db.DataProvider,
+) (*DailyReport, error) {
+	data, err := dataProvider.GetReportData(ctx)
 	if err != nil {
-		return nil, fmt.Errorf("could not get moving averages: %w", err)
+		return nil, fmt.Errorf("could not get report data: %w", err)
 	}
 
-	var reports []DailyReport
-	for _, averages := range movingAverages {
-		reports = append(reports, NewDailyReport(&averages))
-	}
-
-	return reports, nil
+	return &DailyReport{data}, nil
 }

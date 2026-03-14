@@ -13,7 +13,7 @@ const (
 )
 
 func (d *DailyReport) Markdown(title string) string {
-	day := d.averages.Day
+	day := d.data.Day
 
 	heading := bot.EscapeMarkdown(fmt.Sprintf("%s (%s)", title, d.DateString()))
 
@@ -50,16 +50,22 @@ func (d *DailyReport) Markdown(title string) string {
 %s since last low
 %s since last high
 
-Average:   %s
-200W MA:   %s
+Daily Avg:    %s (%s)
+Weekly Avg:   %s (%s)
+200W MA:      %s
+100W MA:      %s
 `,
 		nextHalvingLine,
 		formatDays(daysSinceLastHalving),
 		dateString(lastHalving),
 		formatDays(daysSince(day, mostRecentLowDate)),
 		formatDays(daysSince(day, mostRecentHighDate)),
-		formatNumber(d.averages.DailyAverage, numberWidth),
-		formatNumber(d.averages.MovingAverage200W, numberWidth),
+		formatNumber(d.data.Daily[0].Average, numberWidth),
+		formatNumber(d.data.Daily[1].Average, numberWidth),
+		formatNumber(d.data.Weekly[0].Average, numberWidth),
+		formatNumber(d.data.Weekly[1].Average, numberWidth),
+		formatNumber(d.data.Weekly[0].MovingAverage200, numberWidth),
+		formatNumber(d.data.Weekly[0].MovingAverage100, numberWidth),
 	))
 
 	return fmt.Sprintf(

@@ -234,52 +234,41 @@ TODO: Read daily average and daily moving averages
 #+headers: :engine postgresql :cmdline "postgres://postgres:postgres@localhost:5432/postgres"
 #+begin_src sql
 SELECT
-    btc_avg_1day.day,
-    btc_avg_1day.average
--- TODO
+    day,
+    average
 FROM
     btc_avg_1day
---JOIN
---    btc_avg_1week
---ON
---    btc_avg_1day.day = btc_avg_1week.week
-ORDER BY btc_avg_1day.day DESC
-LIMIT
-    3
+ORDER BY day DESC
+OFFSET 1
+LIMIT 2
 ;
 #+end_src
 
 #+RESULTS:
 | day                    |            average |
 |------------------------+--------------------|
-| 2026-03-13 00:00:00+00 | 71793.309803921569 |
+| 2026-03-13 00:00:00+00 | 71696.951388888889 |
 | 2026-03-12 00:00:00+00 | 70020.864583333333 |
-| 2026-03-11 00:00:00+00 | 70085.024305555556 |
 
 #+headers: :engine postgresql :cmdline "postgres://postgres:postgres@localhost:5432/postgres"
 #+begin_src sql
 SELECT
-    btc_avg_1week.week,
-    btc_avg_1week.average,
-    btc_moving_avg_1week.moving_average_200,
-    btc_moving_avg_1week.moving_average_100
-
-FROM
-    btc_avg_1week
-JOIN
-    btc_moving_avg_1week
+    w.week,
+    w.average,
+    m.moving_average_200,
+    m.moving_average_100
+FROM btc_avg_1week w
+JOIN btc_moving_avg_1week m
 ON
-    btc_avg_1week.week = btc_moving_avg_1week.week
-ORDER BY btc_avg_1week.week DESC
-LIMIT
-    3
+    w.week = m.week
+ORDER BY w.week DESC
+LIMIT 2
 ;
 #+end_src
 
 #+RESULTS:
 | week                   |            average | moving_average_200 | moving_average_100 |
 |------------------------+--------------------+--------------------+--------------------|
-| 2026-03-09 00:00:00+00 | 69987.323383084577 | 58815.855757738836 | 87401.357316172116 |
 | 2026-03-02 00:00:00+00 | 68998.951884920635 | 58617.661428893849 | 87388.832981150794 |
 | 2026-02-23 00:00:00+00 | 66003.213789682540 | 58458.889425793651 | 87376.076245039683 |
 
