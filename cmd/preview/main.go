@@ -51,7 +51,13 @@ func showMessage(day time.Time) {
 	}
 
 	report := analyzer.NewDailyReport(data)
-	fmt.Println(report.Markdown("Yesterday"))
+
+	message, err := report.Markdown("Yesterday")
+	if err != nil {
+		panic(fmt.Errorf("could not get markdown message: %w", err))
+	}
+
+	fmt.Println(message)
 }
 
 func main() {

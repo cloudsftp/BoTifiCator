@@ -8,10 +8,10 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
 
       - name: Build and Test All
-        uses: dagger/dagger-for-github@v6
+        uses: dagger/dagger-for-github@v8.4.1
         with:
           version: "latest"
           verb: call
@@ -34,10 +34,10 @@ jobs:
       id-token: write
 
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
 
       - name: Deploy
-        uses: dagger/dagger-for-github@v6
+        uses: dagger/dagger-for-github@v8.4.1
         with:
           version: "latest"
           verb: call

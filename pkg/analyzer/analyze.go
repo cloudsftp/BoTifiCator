@@ -8,11 +8,11 @@ import (
 )
 
 type DailyReport struct {
-	data *db.ReportData
+	Data *db.ReportData
 }
 
 func NewDailyReport(d *db.ReportData) DailyReport {
-	return DailyReport{data: d}
+	return DailyReport{Data: d}
 }
 
 func Analyze(

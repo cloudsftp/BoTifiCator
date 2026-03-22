@@ -1,0 +1,26 @@
+*{{ .title }} \({{ .d.DateString | escape }}\)*
+{{ if not .nextHalvingOk }}
+*Next halving is in the past\. Please update the halving dates*
+{{- else if lt .daysUntilNextHalving .oneAndAHalfYears }}
+*\!\!\! The Halving is Near \!\!\!*
+{{- end }}
+
+```
+{{- if .nextHalvingOk }}
+{{ .daysSinceLastHalving | formatDays }} since last halving \({{ .lastHalving | dateString | escape }}\)
+{{- end }}
+{{ .daysUntilNextHalving | formatDays }} until next halving \({{ .nextHalving | dateString | escape }}\)
+
+{{ daysSince .day .mostRecentLowDate | formatDays }} since last low
+{{ daysSince .day .mostRecentHighDate | formatDays }} since last high
+
+{{ with .d.Data.Daily -}}
+Daily Avg:   {{ (index . 0).Average | formatNumber }} \({{ (index . 1).Average | formatNumber }}\)
+{{- end }}
+{{ with .d.Data.Weekly -}}
+Weekly Avg:  {{ (index . 0).Average | formatNumber }} \({{ (index . 1).Average | formatNumber }}\)
+
+100W MA:     {{ (index . 0).MovingAverage100 | formatNumber }}
+200W MA:     {{ (index . 0).MovingAverage200 | formatNumber }}
+{{- end }}
+```
