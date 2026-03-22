@@ -29,7 +29,7 @@ func dateString(day time.Time) string {
 }
 
 func (d *DailyReport) DateString() string {
-	return dateString(d.data.Day)
+	return dateString(d.Data.Day)
 }
 
 func formatDays(days int) string {

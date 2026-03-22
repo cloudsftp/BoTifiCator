@@ -90,9 +90,12 @@ func (n *Notificator) SendDailyReports(
 	ctx context.Context,
 	report *analyzer.DailyReport,
 ) error {
-	message := report.Markdown("Yesterday")
+	message, err := report.Markdown("Yesterday")
+	if err != nil {
+		return fmt.Errorf("could not get markdown message: %w", err)
+	}
 
-	err := n.SendMessage(ctx, message)
+	err = n.SendMessage(ctx, message)
 	if err != nil {
 		return fmt.Errorf("could not send markdown of daily report: %w", err)
 	}

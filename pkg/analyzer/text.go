@@ -1,79 +1,61 @@
 package analyzer
 
 import (
+	_ "embed"
 	"fmt"
 	"strconv"
 	"strings"
+	"text/template"
 
 	"github.com/go-telegram/bot"
 )
 
 const (
 	oneAndAHalfYears = 360 + 180
+	numberWidth      = 12
 )
 
-func (d *DailyReport) Markdown(title string) string {
-	day := d.data.Day
+//go:embed message.tmpl
+var messageTemplateString string
 
-	heading := bot.EscapeMarkdown(fmt.Sprintf("%s (%s)", title, d.DateString()))
+var messageTemplate *template.Template
+
+func init() {
+	messageTemplate = template.Must(template.New("message").Funcs(template.FuncMap{
+		"daysSince":  daysSince,
+		"formatDays": formatDays,
+		"dateString": dateString,
+		"formatNumber": func(number float64) string {
+			return formatNumber(number, numberWidth)
+		},
+		"escape": bot.EscapeMarkdown,
+	}).Parse(messageTemplateString))
+}
+
+func (d *DailyReport) Markdown(title string) (string, error) {
+	day := d.Data.Day
 
 	daysUntilNextHalving, nextHalving, nextHalvingOk := daysUntilNextHalving(day)
 	daysSinceLastHalving, lastHalving := daysSinceLastHalving(day)
 
-	halvingWarning := ""
-	switch {
-	case !nextHalvingOk:
-		halvingWarning = "Next halving is in the past. Please update the halving dates"
-	case daysUntilNextHalving < oneAndAHalfYears:
-		halvingWarning = "!!! The Halving is Near !!!"
-	}
-	if halvingWarning != "" {
-		halvingWarning = fmt.Sprintf(
-			"\n*%s*\n",
-			bot.EscapeMarkdown(halvingWarning),
-		)
-	}
-
-	numberWidth := 12
-
-	nextHalvingLine := ""
-	if nextHalvingOk {
-		nextHalvingLine = fmt.Sprintf("%s until next halving (%s)\n",
-			formatDays(daysUntilNextHalving),
-			dateString(nextHalving),
-		)
+	var result strings.Builder
+	err := messageTemplate.Execute(&result, map[string]any{
+		"d":                    d,
+		"day":                  day,
+		"daysSinceLastHalving": daysSinceLastHalving,
+		"lastHalving":          lastHalving,
+		"daysUntilNextHalving": daysUntilNextHalving,
+		"nextHalving":          nextHalving,
+		"nextHalvingOk":        nextHalvingOk,
+		"oneAndAHalfYears":     oneAndAHalfYears,
+		"mostRecentLowDate":    mostRecentLowDate,
+		"mostRecentHighDate":   mostRecentHighDate,
+	})
+	if err != nil {
+		return "", fmt.Errorf("could not execute the template: %w", err)
 	}
 
-	content := bot.EscapeMarkdown(fmt.Sprintf(`
-%s%s since last halving (%s)
-
-%s since last low
-%s since last high
-
-Daily Avg:    %s (%s)
-Weekly Avg:   %s (%s)
-200W MA:      %s
-100W MA:      %s
-`,
-		nextHalvingLine,
-		formatDays(daysSinceLastHalving),
-		dateString(lastHalving),
-		formatDays(daysSince(day, mostRecentLowDate)),
-		formatDays(daysSince(day, mostRecentHighDate)),
-		formatNumber(d.data.Daily[0].Average, numberWidth),
-		formatNumber(d.data.Daily[1].Average, numberWidth),
-		formatNumber(d.data.Weekly[0].Average, numberWidth),
-		formatNumber(d.data.Weekly[1].Average, numberWidth),
-		formatNumber(d.data.Weekly[0].MovingAverage200, numberWidth),
-		formatNumber(d.data.Weekly[0].MovingAverage100, numberWidth),
-	))
-
-	return fmt.Sprintf(
-		"*%s*\n%s\n```%s```",
-		heading,
-		halvingWarning,
-		content,
-	)
+	return result.String(), nil
 }
 
 func formatNumber(f float64, width int) string {
