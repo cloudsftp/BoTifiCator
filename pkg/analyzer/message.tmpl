@@ -1,4 +1,4 @@
-*Yesterday \({{ .d.DateString | escape }}\)*
+*{{ .title }} \({{ .d.DateString | escape }}\)*
 {{ if not .nextHalvingOk }}
 *Next halving is in the past\. Please update the halving dates*
 {{- else if lt .daysUntilNextHalving .oneAndAHalfYears }}

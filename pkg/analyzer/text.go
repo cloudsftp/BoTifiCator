@@ -50,6 +50,7 @@ func (d *DailyReport) Markdown(title string) (string, error) {
 		"oneAndAHalfYears":     oneAndAHalfYears,
 		"mostRecentLowDate":    mostRecentLowDate,
 		"mostRecentHighDate":   mostRecentHighDate,
+		"title":                title,
 	})
 	if err != nil {
 		return "", fmt.Errorf("could not execute the template: %w", err)
