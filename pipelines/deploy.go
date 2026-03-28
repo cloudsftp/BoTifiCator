@@ -9,6 +9,7 @@ import (
 // Publishes and deploys the service to the backend
 func (b *BoTifiCator) PublishAndDeploy(
 	ctx context.Context,
+	// +defaultPath="/"
 	source *dagger.Directory,
 	actor string,
 	token *dagger.Secret,
@@ -32,6 +33,7 @@ func (b *BoTifiCator) PublishAndDeploy(
 // Publishes the image of the service to the github container registry
 func (b *BoTifiCator) PublishImage(
 	ctx context.Context,
+	// +defaultPath="/"
 	source *dagger.Directory,
 	actor string,
 	token *dagger.Secret,
@@ -45,6 +47,7 @@ func (b *BoTifiCator) PublishImage(
 // Builds the image of the service
 func (b *BoTifiCator) BuildImage(
 	ctx context.Context,
+	// +defaultPath="/"
 	source *dagger.Directory,
 ) *dagger.Container {
 	return b.

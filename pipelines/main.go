@@ -21,6 +21,7 @@ const (
 // Builds the service and runs all tests (none right now)
 func (b *BoTifiCator) BuildAndTestAll(
 	ctx context.Context,
+	// +defaultPath="/"
 	source *dagger.Directory,
 ) (string, error) {
 	_, err := b.Lint(ctx, source)
@@ -49,7 +50,11 @@ func (b *BoTifiCator) BuildAndTestAll(
 }
 
 // Runs a linter
-func (b *BoTifiCator) Lint(ctx context.Context, source *dagger.Directory) (string, error) {
+func (b *BoTifiCator) Lint(
+	ctx context.Context,
+	// +defaultPath="/"
+	source *dagger.Directory,
+) (string, error) {
 	return cachedGoBuilder(source).
 		WithExec([]string{"golangci-lint", "run"}).
 		Stdout(ctx)
@@ -57,6 +62,7 @@ func (b *BoTifiCator) Lint(ctx context.Context, source *dagger.Directory) (strin
 
 // Builds the service executable
 func (b *BoTifiCator) Build(
+	// +defaultPath="/"
 	source *dagger.Directory,
 ) *dagger.File {
 	return cachedGoBuilder(source).
@@ -67,6 +73,7 @@ func (b *BoTifiCator) Build(
 // Runs unit tests
 func (b *BoTifiCator) Test(
 	ctx context.Context,
+	// +defaultPath="/"
 	source *dagger.Directory,
 ) (string, error) {
 	return cachedGoBuilder(source).

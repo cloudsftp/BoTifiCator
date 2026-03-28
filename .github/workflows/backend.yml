@@ -15,7 +15,7 @@ jobs:
         with:
           version: "latest"
           verb: call
-          args: build-and-test-all --source=.
+          args: build-and-test-all
           cloud-token: ${{ secrets.DAGGER_CLOUD_TOKEN }}
 
   deploy:
@@ -41,7 +41,7 @@ jobs:
         with:
           version: "latest"
           verb: call
-          args: publish-and-deploy --source=. --actor=$GITHUB_ACTOR --token=env:GITHUB_TOKEN --host=env:HOST --username=env:USERNAME --key=env:KEY
+          args: publish-and-deploy --actor=$GITHUB_ACTOR --token=env:GITHUB_TOKEN --host=env:HOST --username=env:USERNAME --key=env:KEY
           cloud-token: ${{ secrets.DAGGER_CLOUD_TOKEN }}
         env:
           GITHUB_ACTOR: ${{ github.actor }}
